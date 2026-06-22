@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1075227200584",
+    "project_id": "tapin-b6798",
+    "storage_bucket": "tapin-b6798.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1075227200584:android:d5f291c54bcf05db7a9c7d",
+        "android_client_info": {
+          "package_name": "com.attendance.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBB4ps1x2P2Yb2hVAnPLlGAw47IlCRwPMo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

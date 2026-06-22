@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@import "uniwind";
+
+@theme {
+  --color-primary: #6366f1;
+  --color-secondary: #0f172a;
+}
