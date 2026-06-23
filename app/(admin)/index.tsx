@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAdminDashboard } from '@/hooks/useAdminDashboard';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { AdminSelfAttendance } from '@/features/attendance/components/AdminSelfAttendance';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const TAB_BAR_HEIGHT = 80;
@@ -224,6 +225,9 @@ export default function AdminHome() {
         contentContainerStyle={s.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
       >
+        {/* Personal Attendance for Admins/Managers */}
+        {!isSuperAdmin && <AdminSelfAttendance />}
+
         {/* Quick Actions */}
         <View style={s.section}>
           <Text style={s.sectionLabel}>Quick Actions</Text>
