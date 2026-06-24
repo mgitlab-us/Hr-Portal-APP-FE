@@ -81,6 +81,7 @@ export default function EmployeeHome() {
 
     const expectedCheckinStr = record.config?.expectedCheckin || '09:00';
     const workMinutes = record.config?.expectedWorkMinutes || 480;
+    const totalShiftMinutes = record.config?.totalShiftMinutes || (workMinutes + 60);
     const [h, m] = expectedCheckinStr.split(':').map(Number);
     
     // Formatting the check-in window
@@ -88,8 +89,8 @@ export default function EmployeeHome() {
     baseDate.setHours(h, m, 0, 0);
     const checkin12h = format(baseDate, 'hh:mm a');
     
-    // Calculate estimated checkout
-    const shiftEnd = addMinutes(baseDate, workMinutes + 60); 
+    // Calculate estimated checkout using actual shift duration from API
+    const shiftEnd = addMinutes(baseDate, totalShiftMinutes);
     const checkoutTimeStr = format(shiftEnd, 'hh:mm a');
 
     const workingHoursDisplay = record.dailySummary?.totalWorkMinutes
