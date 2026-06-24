@@ -7,14 +7,15 @@ const SOCKET_URL = API_URL.replace('/api/v1', '');
 
 export const useSocket = (event?: string, callback?: (data: any) => void) => {
   const employee = useAuthStore((s) => s.employee);
+  const accessToken = useAuthStore((s) => s.accessToken);
   const companyId = employee?.companyId;
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    if (!companyId) return;
+    if (!accessToken || !companyId) return;
 
     socketRef.current = io(SOCKET_URL, {
-      auth: { companyId },
+      auth: { token: accessToken }, // Server verifies JWT and extracts companyId — never trust client
       transports: ['websocket'],
       forceNew: true
     });
