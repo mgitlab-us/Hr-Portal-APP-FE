@@ -50,22 +50,7 @@ export default function EmployeeHome() {
 
   useEffect(() => { ensurePermissions(); }, []);
 
-  if (isLoading) {
-    return (
-      <SafeAreaView className="flex-1 bg-white">
-        <View className="p-6">
-          <Skeleton width={180} height={32} borderRadius={8} style={{ marginBottom: 8 }} />
-          <Skeleton width={120} height={16} borderRadius={4} style={{ marginBottom: 32 }} />
-          <View className="items-center mb-10">
-            <Skeleton width={160} height={160} borderRadius={80} />
-          </View>
-          <Skeleton width="100%" height={80} borderRadius={24} style={{ marginBottom: 20 }} />
-          <Skeleton width="100%" height={120} borderRadius={24} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
+  // ── Must call all hooks unconditionally BEFORE any early returns ──────────────
   const processedData = React.useMemo(() => {
     if (!record) return null;
 
@@ -83,13 +68,11 @@ export default function EmployeeHome() {
     const workMinutes = record.config?.expectedWorkMinutes || 480;
     const totalShiftMinutes = record.config?.totalShiftMinutes || (workMinutes + 60);
     const [h, m] = expectedCheckinStr.split(':').map(Number);
-    
-    // Formatting the check-in window
+
     const baseDate = new Date();
     baseDate.setHours(h, m, 0, 0);
     const checkin12h = format(baseDate, 'hh:mm a');
-    
-    // Calculate estimated checkout using actual shift duration from API
+
     const shiftEnd = addMinutes(baseDate, totalShiftMinutes);
     const checkoutTimeStr = format(shiftEnd, 'hh:mm a');
 
@@ -97,19 +80,27 @@ export default function EmployeeHome() {
       ? `${Math.floor(record.dailySummary.totalWorkMinutes / 60)}h ${record.dailySummary.totalWorkMinutes % 60}m`
       : null;
 
-    return {
-      activeBreak,
-      previouslyConsumedSeconds,
-      checkin12h,
-      checkoutTimeStr,
-      workingHoursDisplay
-    };
+    return { activeBreak, previouslyConsumedSeconds, checkin12h, checkoutTimeStr, workingHoursDisplay };
   }, [record]);
 
-  if (!processedData) {
-    // We are still loading or record is null
-    return null;
+  // ── Early returns AFTER all hooks ─────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-white">
+        <View className="p-6">
+          <Skeleton width={180} height={32} borderRadius={8} style={{ marginBottom: 8 }} />
+          <Skeleton width={120} height={16} borderRadius={4} style={{ marginBottom: 32 }} />
+          <View className="items-center mb-10">
+            <Skeleton width={160} height={160} borderRadius={80} />
+          </View>
+          <Skeleton width="100%" height={80} borderRadius={24} style={{ marginBottom: 20 }} />
+          <Skeleton width="100%" height={120} borderRadius={24} />
+        </View>
+      </SafeAreaView>
+    );
   }
+
+  if (!processedData) return null;
 
   return (
     // Changed bg-slate-50 → bg-white so the button canvas blends seamlessly
