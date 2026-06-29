@@ -94,7 +94,7 @@ export default function NoticeBoardScreen() {
                 <Text className="text-[10px] font-bold uppercase tracking-[2px] mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
                   Organization
                 </Text>
-                <h1 className="text-2xl font-extrabold text-white tracking-tight">Notice Board</h1>
+                <Text className="text-2xl font-extrabold text-white tracking-tight">Notice Board</Text>
               </View>
               <View className="w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/10">
                 <Ionicons name="megaphone" size={20} color="#fff" />
