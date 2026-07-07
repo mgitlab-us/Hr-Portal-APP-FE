@@ -26,17 +26,17 @@ export default function EmployeeLayout() {
         }}
       />
       <Tabs.Screen
-        name="leaves"
-        options={{
-          title: 'Leaves',
-          tabBarIcon: ({ color, size }) => <Ionicons name="airplane-outline" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="my-corrections"
+        name="requests"
         options={{
           title: 'Requests',
           tabBarIcon: ({ color, size }) => <Ionicons name="receipt-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="notices"
+        options={{
+          title: 'Notice Board',
+          tabBarIcon: ({ color, size }) => <Ionicons name="megaphone-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen

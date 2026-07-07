@@ -50,6 +50,40 @@ export default function EmployeeHome() {
 
   useEffect(() => { ensurePermissions(); }, []);
 
+  // ── Must call all hooks unconditionally BEFORE any early returns ──────────────
+  const processedData = React.useMemo(() => {
+    if (!record) return null;
+
+    const activeBreak = record.breakSessions?.find((b: any) => !b.endTime);
+    const previouslyConsumedSeconds = (record.breakSessions || [])
+      .filter((b: any) => b.endTime)
+      .reduce((sum: number, b: any) => {
+        const diff = Math.floor(
+          (new Date(b.endTime).getTime() - new Date(b.startTime).getTime()) / 1000
+        );
+        return sum + Math.max(0, diff);
+      }, 0);
+
+    const expectedCheckinStr = record.config?.expectedCheckin || '09:00';
+    const workMinutes = record.config?.expectedWorkMinutes || 480;
+    const totalShiftMinutes = record.config?.totalShiftMinutes || (workMinutes + 60);
+    const [h, m] = expectedCheckinStr.split(':').map(Number);
+
+    const baseDate = new Date();
+    baseDate.setHours(h, m, 0, 0);
+    const checkin12h = format(baseDate, 'hh:mm a');
+
+    const shiftEnd = addMinutes(baseDate, totalShiftMinutes);
+    const checkoutTimeStr = format(shiftEnd, 'hh:mm a');
+
+    const workingHoursDisplay = record.dailySummary?.totalWorkMinutes
+      ? `${Math.floor(record.dailySummary.totalWorkMinutes / 60)}h ${record.dailySummary.totalWorkMinutes % 60}m`
+      : null;
+
+    return { activeBreak, previouslyConsumedSeconds, checkin12h, checkoutTimeStr, workingHoursDisplay };
+  }, [record]);
+
+  // ── Early returns AFTER all hooks ─────────────────────────────────────────────
   if (isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-white">
@@ -66,49 +100,7 @@ export default function EmployeeHome() {
     );
   }
 
-  const processedData = React.useMemo(() => {
-    if (!record) return null;
-
-    const activeBreak = record.breakSessions?.find((b: any) => !b.endTime);
-    const previouslyConsumedSeconds = (record.breakSessions || [])
-      .filter((b: any) => b.endTime)
-      .reduce((sum: number, b: any) => {
-        const diff = Math.floor(
-          (new Date(b.endTime).getTime() - new Date(b.startTime).getTime()) / 1000
-        );
-        return sum + Math.max(0, diff);
-      }, 0);
-
-    const expectedCheckinStr = record.config?.expectedCheckin || '09:00';
-    const workMinutes = record.config?.expectedWorkMinutes || 480;
-    const [h, m] = expectedCheckinStr.split(':').map(Number);
-    
-    // Formatting the check-in window
-    const baseDate = new Date();
-    baseDate.setHours(h, m, 0, 0);
-    const checkin12h = format(baseDate, 'hh:mm a');
-    
-    // Calculate estimated checkout
-    const shiftEnd = addMinutes(baseDate, workMinutes + 60); 
-    const checkoutTimeStr = format(shiftEnd, 'hh:mm a');
-
-    const workingHoursDisplay = record.dailySummary?.totalWorkMinutes
-      ? `${Math.floor(record.dailySummary.totalWorkMinutes / 60)}h ${record.dailySummary.totalWorkMinutes % 60}m`
-      : null;
-
-    return {
-      activeBreak,
-      previouslyConsumedSeconds,
-      checkin12h,
-      checkoutTimeStr,
-      workingHoursDisplay
-    };
-  }, [record]);
-
-  if (!processedData) {
-    // We are still loading or record is null
-    return null;
-  }
+  if (!processedData) return null;
 
   return (
     // Changed bg-slate-50 → bg-white so the button canvas blends seamlessly
