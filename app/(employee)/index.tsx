@@ -50,7 +50,22 @@ export default function EmployeeHome() {
 
   useEffect(() => { ensurePermissions(); }, []);
 
-  // ── Must call all hooks unconditionally BEFORE any early returns ──────────────
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-white">
+        <View className="p-6">
+          <Skeleton width={180} height={32} borderRadius={8} style={{ marginBottom: 8 }} />
+          <Skeleton width={120} height={16} borderRadius={4} style={{ marginBottom: 32 }} />
+          <View className="items-center mb-10">
+            <Skeleton width={160} height={160} borderRadius={80} />
+          </View>
+          <Skeleton width="100%" height={80} borderRadius={24} style={{ marginBottom: 20 }} />
+          <Skeleton width="100%" height={120} borderRadius={24} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const processedData = React.useMemo(() => {
     if (!record) return null;
 
@@ -83,7 +98,6 @@ export default function EmployeeHome() {
     return { activeBreak, previouslyConsumedSeconds, checkin12h, checkoutTimeStr, workingHoursDisplay };
   }, [record]);
 
-  // ── Early returns AFTER all hooks ─────────────────────────────────────────────
   if (isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-white">
@@ -100,7 +114,10 @@ export default function EmployeeHome() {
     );
   }
 
-  if (!processedData) return null;
+  if (!processedData) {
+    // We are still loading or record is null
+    return null;
+  }
 
   return (
     // Changed bg-slate-50 → bg-white so the button canvas blends seamlessly

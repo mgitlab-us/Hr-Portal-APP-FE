@@ -6,7 +6,7 @@ function cmakeArgsBlock(ninjaPath) {
   return `
         externalNativeBuild {
             cmake {
-                arguments "-DCMAKE_MAKE_PROGRAM=${makeProgram}", "-DCMAKE_OBJECT_PATH_MAX=1024"
+                arguments "-DCMAKE_MAKE_PROGRAM=${makeProgram}", "-DCMAKE_OBJECT_PATH_MAX=200"
             }
         }`;
 }
@@ -21,7 +21,7 @@ subprojects { subproject ->
         subproject.android.defaultConfig {
             externalNativeBuild {
                 cmake {
-                    arguments "-DCMAKE_MAKE_PROGRAM=${makeProgram}", "-DCMAKE_OBJECT_PATH_MAX=1024"
+                    arguments "-DCMAKE_MAKE_PROGRAM=${makeProgram}", "-DCMAKE_OBJECT_PATH_MAX=200"
                 }
             }
         }
@@ -30,9 +30,25 @@ subprojects { subproject ->
         subproject.android.defaultConfig {
             externalNativeBuild {
                 cmake {
-                    arguments "-DCMAKE_MAKE_PROGRAM=${makeProgram}", "-DCMAKE_OBJECT_PATH_MAX=1024"
+                    arguments "-DCMAKE_MAKE_PROGRAM=${makeProgram}", "-DCMAKE_OBJECT_PATH_MAX=200"
                 }
             }
+        }
+    }
+    def configureStaging = { proj ->
+        try {
+            if (proj.android.externalNativeBuild.cmake.path != null) {
+                proj.android.externalNativeBuild.cmake.buildStagingDirectory = "\${rootProject.projectDir}/../.cxx/\${proj.name}"
+            }
+        } catch (Exception e) {
+            // Not a CMake project or not configured
+        }
+    }
+    if (subproject.state.executed) {
+        configureStaging(subproject)
+    } else {
+        subproject.afterEvaluate {
+            configureStaging(subproject)
         }
     }
 }
