@@ -24,7 +24,11 @@ export const useSocket = (event?: string, callback?: (data: any) => void) => {
 
     if (event && callback) {
       socket.on(event, (data) => {
-        if (data.companyId === companyId) {
+        // Company rooms are enforced server-side. Client-side filtering must
+        // still drop cross-tenant payloads, but allow unkeyed trigger events
+        // such as `{}` broadcasts that have no companyId by design.
+        const isUnkeyed = data == null || typeof data !== 'object' || !('companyId' in data);
+        if (isUnkeyed || data.companyId === companyId) {
           callback(data);
         }
       });
