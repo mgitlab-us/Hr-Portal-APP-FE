@@ -415,6 +415,11 @@ const s = StyleSheet.create({
   label: { fontSize: 12, fontWeight: '700', color: C.sub, marginBottom: 7 },
   input: { backgroundColor: '#F8FAFC', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: C.text, borderWidth: 0.5, borderColor: C.border },
   row: { flexDirection: 'row' },
+  periodContainer: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 10, padding: 3, gap: 3 },
+  periodBtn: { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  periodBtnActive: { backgroundColor: C.accent },
+  periodText: { fontSize: 12, fontWeight: '700', color: C.sub },
+  periodTextActive: { color: '#FFF' },
   hint: { fontSize: 11, color: C.muted, marginTop: 5, marginLeft: 2 },
 
   saveBtn: { backgroundColor: C.accent, borderRadius: 14, padding: 16, alignItems: 'center' },
