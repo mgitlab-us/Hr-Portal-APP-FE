@@ -6,6 +6,7 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '@/features/auth/store';
 import { KeyboardProvider, KeyboardController } from 'react-native-keyboard-controller';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const queryClient = new QueryClient();
 
@@ -33,10 +34,12 @@ export default function RootLayout() {
   }, [isAuthenticated, employee, segments]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <KeyboardProvider enabled={isLinked}>
-        <Slot />
-      </KeyboardProvider>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <KeyboardProvider enabled={isLinked}>
+          <Slot />
+        </KeyboardProvider>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
