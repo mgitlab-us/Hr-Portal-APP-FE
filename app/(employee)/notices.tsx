@@ -1,103 +1,122 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, FlatList, ActivityIndicator,
-  StatusBar, RefreshControl, TouchableOpacity,
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSocket } from '@/hooks/useSocket';
-import { apiClient } from '@/lib/axios';
-import { format, parseISO } from 'date-fns';
-
-interface Notice {
-  id: string;
-  title: string;
-  content: string;
-  type: 'ANNOUNCEMENT' | 'HOLIDAY' | 'EVENT' | 'URGENT';
-  createdAt: string;
-}
-
-const TYPE_CONFIG: Record<string, { bg: string; text: string; icon: string; color: string }> = {
-  ANNOUNCEMENT: { bg: 'bg-blue-50', text: 'text-blue-600', icon: 'megaphone-outline', color: '#2563EB' },
-  HOLIDAY: { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: 'sunny-outline', color: '#059669' },
-  EVENT: { bg: 'bg-purple-50', text: 'text-purple-600', icon: 'calendar-outline', color: '#7C3AED' },
-  URGENT: { bg: 'bg-rose-50', text: 'text-rose-600', icon: 'alert-circle-outline', color: '#E11D48' },
-};
+import { useFocusEffect } from 'expo-router';
+import { TAB_BAR_HEIGHT } from '@/components/CustomTabBar';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { useNoticeRealtime, useNotices } from '@/features/notices/hooks';
+import { NoticeCard } from '@/features/notices/components/NoticeCard';
+import { NoticeDetailModal } from '@/features/notices/components/NoticeDetailModal';
+import { NoticeTypeFilters } from '@/features/notices/components/NoticeTypeFilters';
+import {
+  NOTICE_FILTERS,
+  type Notice,
+  type NoticeFilter,
+} from '@/features/notices/types';
 
 export default function NoticeBoardScreen() {
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<NoticeFilter>('ALL');
+  const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const listRef = useRef<FlatList<Notice>>(null);
 
-  const loadNotices = useCallback(async () => {
+  const {
+    data,
+    isLoading,
+    isError,
+    isRefetching,
+    isFetchingNextPage,
+    isFetching,
+    hasNextPage,
+    isStale,
+    fetchNextPage,
+    refetch,
+  } = useNotices(filter);
+
+  useNoticeRealtime();
+
+  // Reconcile edits/deletes when the tab regains focus after the cache goes stale.
+  useFocusEffect(
+    useCallback(() => {
+      if (isStale && !isFetching) {
+        void refetch();
+      }
+    }, [isFetching, isStale, refetch])
+  );
+
+  const notices = useMemo(
+    () => data?.pages.flatMap((page) => page.data) ?? [],
+    [data]
+  );
+  const total = data?.pages[0]?.total ?? notices.length;
+  const activeFilter = NOTICE_FILTERS.find((option) => option.value === filter);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
     try {
-      const res = await apiClient.get('/notices', { params: { limit: 100 } });
-      const payload = res.data;
-      setNotices(Array.isArray(payload) ? payload : payload?.data ?? []);
-    } catch (e) {
-      console.error('[Notices] Fetch error:', e);
+      await refetch();
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
+  }, [refetch]);
+
+  const handleFilterChange = useCallback((value: NoticeFilter) => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    setFilter(value);
   }, []);
 
-  useEffect(() => { loadNotices(); }, [loadNotices]);
+  const handleEndReached = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  // Real-time updates
-  useSocket('notice:new', (notice: Notice) => {
-    setNotices((prev) => [notice, ...prev]);
-  });
+  const renderItem = useCallback(
+    ({ item }: { item: Notice }) => (
+      <NoticeCard notice={item} onPress={setSelectedNotice} />
+    ),
+    []
+  );
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadNotices();
-  };
-
-  const renderItem = ({ item }: { item: Notice }) => {
-    const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.ANNOUNCEMENT;
-    const date = format(parseISO(item.createdAt), 'MMM dd, yyyy · hh:mm a');
-
-    return (
-      <View
-        className="bg-white rounded-2xl mb-4 overflow-hidden"
-        style={{ borderWidth: 0.5, borderColor: '#E2E8F0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
-      >
-        <View className="p-4">
-          <View className="flex-row items-center justify-between mb-3">
-            <View className={`flex-row items-center gap-1.5 px-2.5 py-1 rounded-lg ${cfg.bg}`}>
-              <Ionicons name={cfg.icon as any} size={14} color={cfg.color} />
-              <Text className={`text-[11px] font-bold uppercase tracking-wider ${cfg.text}`}>
-                {item.type}
-              </Text>
-            </View>
-            <Text className="text-[11px] font-medium text-slate-400">{date}</Text>
-          </View>
-
-          <Text className="text-lg font-bold text-slate-800 mb-2">{item.title}</Text>
-          <Text className="text-sm text-slate-500 leading-6">{item.content}</Text>
-        </View>
-      </View>
-    );
-  };
+  const countLabel = isLoading
+    ? 'Loading notices...'
+    : total === 1
+      ? '1 notice'
+      : `${notices.length}${total > notices.length ? ` of ${total}` : ''} notices`;
 
   return (
     <View className="flex-1 bg-slate-50">
       <StatusBar barStyle="light-content" />
 
-      {/* Premium Header */}
       <LinearGradient colors={['#0D1B2A', '#1a2d42']}>
         <SafeAreaView edges={['top']}>
-          <View className="px-5 pt-2 pb-8">
+          <View className="px-5 pb-8 pt-2">
             <View className="flex-row items-center justify-between">
               <View>
-                <Text className="text-[10px] font-bold uppercase tracking-[2px] mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                <Text
+                  className="mb-1 text-[10px] font-bold uppercase tracking-[2px]"
+                  style={{ color: 'rgba(255,255,255,0.4)' }}
+                >
                   Organization
                 </Text>
-                <Text className="text-2xl font-extrabold text-white tracking-tight">Notice Board</Text>
+                <Text className="text-2xl font-extrabold tracking-tight text-white">
+                  Notice Board
+                </Text>
+                <Text className="mt-1 text-xs text-white/50">
+                  Announcements, holidays and urgent updates
+                </Text>
               </View>
-              <View className="w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/10">
+              <View className="h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10">
                 <Ionicons name="megaphone" size={20} color="#fff" />
               </View>
             </View>
@@ -105,36 +124,105 @@ export default function NoticeBoardScreen() {
         </SafeAreaView>
       </LinearGradient>
 
-      {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#6366F1" size="large" />
-          <Text className="text-xs text-slate-400 mt-4 font-medium uppercase tracking-widest">
-            Fetching updates...
+      <View className="pb-2 pt-4">
+        <NoticeTypeFilters value={filter} onChange={handleFilterChange} />
+
+        <View className="mt-2 flex-row items-center justify-between px-5">
+          <Text className="text-[11px] font-medium text-slate-400">{countLabel}</Text>
+          {isRefetching && !refreshing && !isLoading ? (
+            <ActivityIndicator size="small" color="#94A3B8" />
+          ) : null}
+        </View>
+      </View>
+
+      {isLoading ? (
+        <View className="flex-1 px-5 pt-2">
+          {[0, 1, 2].map((item) => (
+            <Skeleton
+              key={item}
+              width="100%"
+              height={150}
+              borderRadius={16}
+              style={{ marginBottom: 12 }}
+            />
+          ))}
+        </View>
+      ) : isError && notices.length === 0 ? (
+        <View className="flex-1 items-center justify-center px-10">
+          <View className="mb-5 h-20 w-20 items-center justify-center rounded-3xl border border-rose-100 bg-rose-50">
+            <Ionicons name="cloud-offline-outline" size={32} color="#E11D48" />
+          </View>
+          <Text className="mb-2 text-lg font-bold text-slate-700">Could not load notices</Text>
+          <Text className="text-center text-sm leading-6 text-slate-400">
+            Check your connection and try again.
           </Text>
+          <TouchableOpacity
+            onPress={() => void refetch()}
+            className="mt-5 rounded-xl bg-[#1C2840] px-5 py-3"
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading notices"
+          >
+            <Text className="text-xs font-bold uppercase tracking-wider text-white">Try again</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           data={notices}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 20,
+            paddingTop: 8,
+            paddingBottom: TAB_BAR_HEIGHT + 24,
+            flexGrow: notices.length === 0 ? 1 : 0,
+          }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={loadNotices} tintColor="#6366F1" />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor="#1C2840"
+              colors={['#1C2840']}
+            />
           }
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.4}
           ListEmptyComponent={
-            <View className="items-center mt-20 px-10">
-              <View className="w-20 h-20 rounded-3xl bg-slate-100 items-center justify-center mb-6 border border-slate-200">
+            <View className="mt-20 items-center px-10">
+              <View className="mb-6 h-20 w-20 items-center justify-center rounded-3xl border border-slate-200 bg-slate-100">
                 <Ionicons name="notifications-off-outline" size={32} color="#94A3B8" />
               </View>
-              <Text className="text-lg font-bold text-slate-700 mb-2">Steady here</Text>
-              <Text className="text-sm text-slate-400 text-center leading-6">
-                No new notices or announcements have been posted yet.
+              <Text className="mb-2 text-lg font-bold text-slate-700">
+                {filter === 'ALL' ? 'Steady here' : `No ${activeFilter?.label.toLowerCase() ?? 'notices'} yet`}
+              </Text>
+              <Text className="text-center text-sm leading-6 text-slate-400">
+                {filter === 'ALL'
+                  ? 'No new notices or announcements have been posted yet.'
+                  : 'There are no notices in this category right now.'}
               </Text>
             </View>
           }
+          ListFooterComponent={
+            notices.length > 0 ? (
+              <View className="items-center py-4">
+                {isFetchingNextPage ? (
+                  <ActivityIndicator color="#1C2840" />
+                ) : !hasNextPage ? (
+                  <Text className="text-[10px] font-semibold uppercase tracking-widest text-slate-300">
+                    You're all caught up
+                  </Text>
+                ) : null}
+              </View>
+            ) : null
+          }
         />
       )}
+
+      <NoticeDetailModal
+        notice={selectedNotice}
+        onClose={() => setSelectedNotice(null)}
+      />
     </View>
   );
 }
