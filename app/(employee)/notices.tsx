@@ -32,8 +32,9 @@ export default function NoticeBoardScreen() {
 
   const loadNotices = useCallback(async () => {
     try {
-      const res = await apiClient.get('/notices');
-      setNotices(res.data);
+      const res = await apiClient.get('/notices', { params: { limit: 100 } });
+      const payload = res.data;
+      setNotices(Array.isArray(payload) ? payload : payload?.data ?? []);
     } catch (e) {
       console.error('[Notices] Fetch error:', e);
     } finally {
