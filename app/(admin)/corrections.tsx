@@ -5,7 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { correctionApi } from '@/features/corrections/api';
 import { Ionicons } from '@expo/vector-icons';
-import { format, parseISO } from 'date-fns';
+import { formatDateDMY, formatTime12h } from '@/lib/datetime';
 
 const C = {
   navy: '#0F1D3A',
@@ -76,22 +76,22 @@ export default function AdminCorrectionsScreen() {
             <Text style={s.userDept}>{item.employee.profile?.department || 'Member'}</Text>
           </View>
         </View>
-        <Text style={s.dateText}>{format(parseISO(item.attendanceRecord.date), 'MMM dd')}</Text>
+        <Text style={s.dateText}>{formatDateDMY(item.attendanceRecord.date, 'dd MMM yyyy')}</Text>
       </View>
 
       <View style={s.compareRow}>
         <View style={s.compareBox}>
           <Text style={s.compareLabel}>ORIGINAL</Text>
-          <Text style={s.compareValue}>{format(parseISO(item.originalCheckin), 'hh:mm a')}</Text>
+          <Text style={s.compareValue}>{formatTime12h(item.originalCheckin)}</Text>
           <Text style={s.compareValue}>
-            {item.originalCheckout ? format(parseISO(item.originalCheckout), 'hh:mm a') : '--:--'}
+            {item.originalCheckout ? formatTime12h(item.originalCheckout) : '--:--'}
           </Text>
         </View>
         <Ionicons name="arrow-forward" size={20} color="#E2E8F0" />
         <View style={s.compareBox}>
           <Text style={[s.compareLabel, { color: C.accent }]}>REQUESTED</Text>
-          <Text style={s.compareValue}>{item.requestedCheckin ? format(parseISO(item.requestedCheckin), 'hh:mm a') : 'NC'}</Text>
-          <Text style={s.compareValue}>{item.requestedCheckout ? format(parseISO(item.requestedCheckout), 'hh:mm a') : 'NC'}</Text>
+          <Text style={s.compareValue}>{item.requestedCheckin ? formatTime12h(item.requestedCheckin) : 'NC'}</Text>
+          <Text style={s.compareValue}>{item.requestedCheckout ? formatTime12h(item.requestedCheckout) : 'NC'}</Text>
         </View>
       </View>
 

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator,
-  StatusBar, Platform, Modal, TextInput, Alert, KeyboardAvoidingView,
+  StatusBar, Platform, Modal, KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
+import { formatTime12h } from '@/lib/datetime';
 import { useDailyLogs } from '@/hooks/useDailyLogs';
 
 const C = {
@@ -62,31 +63,51 @@ export default function DailyLogsScreen() {
 
   const [editingLog, setEditingLog] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [checkin, setCheckin] = useState('');
-  const [checkout, setCheckout] = useState('');
+  const [checkinDate, setCheckinDate] = useState<Date | null>(null);
+  const [checkoutDate, setCheckoutDate] = useState<Date | null>(null);
+  const [timePicker, setTimePicker] = useState<'checkin' | 'checkout' | null>(null);
+  const [toast, setToast] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3200);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const onDateChange = (_: any, selectedDate?: Date) => {
     setShowPicker(Platform.OS === 'ios');
     if (selectedDate) setDate(selectedDate);
   };
 
+  const recordDay = (record: any): Date => {
+    const parsed = record?.date ? new Date(record.date) : new Date();
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  };
+
+  const mergeRecordTime = (record: any, picked: Date): Date => {
+    const merged = recordDay(record);
+    merged.setHours(picked.getHours(), picked.getMinutes(), 0, 0);
+    return merged;
+  };
+
   const openCorrection = (item: any) => {
     setEditingLog(item);
-    setCheckin(item.checkinAt || '');
-    setCheckout(item.checkoutAt || '');
+    setCheckinDate(item.checkinAt ? new Date(item.checkinAt) : null);
+    setCheckoutDate(item.checkoutAt ? new Date(item.checkoutAt) : null);
+    setToast(null);
     setModalVisible(true);
   };
 
   const handleSaveCorrection = async () => {
     try {
       await correctRecord(editingLog.id, {
-        checkinTime: checkin || undefined,
-        checkoutTime: checkout || undefined,
+        checkinTime: checkinDate ? checkinDate.toISOString() : undefined,
+        checkoutTime: checkoutDate ? checkoutDate.toISOString() : undefined,
       });
       setModalVisible(false);
-      Alert.alert('Updated', 'Attendance record has been corrected.');
+      setToast({ kind: 'success', message: 'Attendance record corrected.' });
     } catch {
-      Alert.alert('Error', 'Failed to update record.');
+      setToast({ kind: 'error', message: 'Failed to update record.' });
     }
   };
 
@@ -124,7 +145,9 @@ export default function DailyLogsScreen() {
             </View>
             <View style={s.timeTextCol}>
               <Text style={s.timeLabel}>Check in</Text>
-              <Text style={s.timeVal}>{item.checkin || '--:--'}</Text>
+              <Text style={s.timeVal}>
+                {item.checkinAt ? formatTime12h(item.checkinAt) : item.checkin || '--:--'}
+              </Text>
             </View>
           </View>
           <View style={s.timeDivider} />
@@ -134,7 +157,9 @@ export default function DailyLogsScreen() {
             </View>
             <View style={s.timeTextCol}>
               <Text style={s.timeLabel}>Check out</Text>
-              <Text style={s.timeVal}>{item.checkout || '--:--'}</Text>
+              <Text style={s.timeVal}>
+                {item.checkoutAt ? formatTime12h(item.checkoutAt) : item.checkout || '--:--'}
+              </Text>
             </View>
           </View>
         </View>
@@ -165,6 +190,20 @@ export default function DailyLogsScreen() {
           </TouchableOpacity>
         </SafeAreaView>
       </LinearGradient>
+
+      {toast && (
+        <View
+          pointerEvents="none"
+          style={[s.toast, toast.kind === 'success' ? s.toastSuccess : s.toastError]}
+        >
+          <Ionicons
+            name={toast.kind === 'success' ? 'checkmark-circle' : 'alert-circle'}
+            size={16}
+            color={toast.kind === 'success' ? C.green : C.red}
+          />
+          <Text style={s.toastText}>{toast.message}</Text>
+        </View>
+      )}
 
       {showPicker && (
         <DateTimePicker
@@ -226,25 +265,52 @@ export default function DailyLogsScreen() {
             <Text style={s.modalSub}>Editing record for {editingLog?.name}</Text>
 
             <View style={s.inputGroup}>
-              <Text style={s.label}>Check-in Time (ISO)</Text>
-              <TextInput
-                style={s.input}
-                value={checkin}
-                onChangeText={setCheckin}
-                placeholder="e.g. 2024-03-20T09:00:00Z"
-                placeholderTextColor={C.muted}
-              />
+              <Text style={s.label}>Check-in Time</Text>
+              <TouchableOpacity
+                style={s.timePickBtn}
+                onPress={() => setTimePicker('checkin')}
+                activeOpacity={0.75}
+              >
+                <Ionicons name="enter-outline" size={17} color={C.accent} />
+                <Text style={s.timePickText}>
+                  {checkinDate ? formatTime12h(checkinDate) : 'Tap to set time'}
+                </Text>
+                <Ionicons name="chevron-forward" size={15} color={C.muted} />
+              </TouchableOpacity>
             </View>
             <View style={s.inputGroup}>
-              <Text style={s.label}>Check-out Time (ISO)</Text>
-              <TextInput
-                style={s.input}
-                value={checkout}
-                onChangeText={setCheckout}
-                placeholder="e.g. 2024-03-20T18:00:00Z"
-                placeholderTextColor={C.muted}
-              />
+              <Text style={s.label}>Check-out Time</Text>
+              <TouchableOpacity
+                style={s.timePickBtn}
+                onPress={() => setTimePicker('checkout')}
+                activeOpacity={0.75}
+              >
+                <Ionicons name="exit-outline" size={17} color={C.green} />
+                <Text style={s.timePickText}>
+                  {checkoutDate ? formatTime12h(checkoutDate) : 'Tap to set time'}
+                </Text>
+                <Ionicons name="chevron-forward" size={15} color={C.muted} />
+              </TouchableOpacity>
             </View>
+
+            {timePicker && (
+              <DateTimePicker
+                value={
+                  (timePicker === 'checkin' ? checkinDate : checkoutDate) ??
+                  new Date(recordDay(editingLog).setHours(9, 0, 0, 0))
+                }
+                mode="time"
+                display="default"
+                is24Hour={false}
+                onChange={(_, picked) => {
+                  const target = timePicker;
+                  setTimePicker(null);
+                  if (!picked) return;
+                  if (target === 'checkin') setCheckinDate(mergeRecordTime(editingLog, picked));
+                  else setCheckoutDate(mergeRecordTime(editingLog, picked));
+                }}
+              />
+            )}
 
             <TouchableOpacity style={s.saveBtn} onPress={handleSaveCorrection}>
               <Text style={s.saveBtnText}>Save Correction</Text>
@@ -315,7 +381,40 @@ const s = StyleSheet.create({
   modalSub: { fontSize: 13, color: C.sub, marginBottom: 24, fontWeight: '500' },
   inputGroup: { marginBottom: 18 },
   label: { fontSize: 12, fontWeight: '700', color: C.sub, marginBottom: 7 },
-  input: { backgroundColor: '#F8FAFC', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: C.text, borderWidth: 0.5, borderColor: C.border },
+  timePickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderWidth: 0.5,
+    borderColor: C.border,
+  },
+  timePickText: { flex: 1, fontSize: 15, fontWeight: '700', color: C.text },
   saveBtn: { backgroundColor: C.accent, borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#FFF', fontWeight: '800', fontSize: 15, letterSpacing: 0.3 },
+  toast: {
+    position: 'absolute',
+    top: 74,
+    left: 18,
+    right: 18,
+    zIndex: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  toastSuccess: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
+  toastError: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  toastText: { flex: 1, fontSize: 12.5, fontWeight: '700', color: C.text },
 });

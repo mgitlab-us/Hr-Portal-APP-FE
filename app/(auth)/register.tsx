@@ -8,6 +8,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeKeyboardAvoidingView } from '../../src/components/ui/SafeKeyboardAvoidingView';
 import { useForm, Controller } from 'react-hook-form';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { authApi } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/store';
@@ -21,11 +22,11 @@ const C = {
   navy: '#0F1D3A',
   navyMid: '#162447',
   navyLight: '#1E3A6E',
-  accent: '#4A90D9',
-  accentBright: '#5BA3F5',
-  teal: '#1DB8A0',
+  accent: '#2F66E8',
+  accentBright: '#4A8CF7',
+  teal: '#3A5FD9',
   white: '#FFFFFF',
-  offWhite: '#F7F9FC',
+  offWhite: '#F3F6FD',
   errorRed: '#FF6B6B',
 };
 
@@ -251,7 +252,7 @@ export default function RegisterScreen() {
         <Animated.View style={{ opacity: fadeIn, transform: [{ translateY: slideUp }] }}>
           <View style={s.brandRow}>
             <View style={s.logoBoxWrap}>
-              <LinearGradient colors={[C.accentBright, C.teal]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.logoBox}>
+              <LinearGradient colors={['#4A8CF7', '#2563EB']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.logoBox}>
                 <Ionicons name="time-outline" size={16} color={C.white} />
               </LinearGradient>
             </View>
@@ -286,6 +287,26 @@ export default function RegisterScreen() {
         automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
       >
         <Animated.View style={[s.card, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
+          {/* Same smooth, layered blue wave used on the TapIn login screen. */}
+          <View style={s.waves} pointerEvents="none">
+            <Svg width="100%" height="100%" viewBox="0 0 400 180" preserveAspectRatio="none">
+              <Path
+                d="M0 58 C58 48 118 30 184 30 C244 30 264 78 310 80 C346 81 375 49 400 42 L400 180 L0 180 Z"
+                fill="#DCE9FC"
+                opacity={0.88}
+              />
+              <Path
+                d="M0 92 C70 104 132 124 205 143 C278 162 338 126 400 105 L400 180 L0 180 Z"
+                fill="#C9DDFB"
+                opacity={0.48}
+              />
+              <Path
+                d="M0 132 C72 112 126 121 190 145 C262 172 329 167 400 143 L400 180 L0 180 Z"
+                fill="#EAF2FF"
+                opacity={0.72}
+              />
+            </Svg>
+          </View>
 
           <View style={s.handle} />
 
@@ -296,7 +317,7 @@ export default function RegisterScreen() {
             </View>
             <View style={s.cardAvatarRing}>
               <View style={s.cardAvatarClip}>
-                <LinearGradient colors={[C.accentBright, C.teal]} style={s.cardAvatar}>
+                <LinearGradient colors={['#4A8CF7', '#2563EB']} style={s.cardAvatar}>
                   <Ionicons name={currentStep.icon as any} size={18} color={C.white} />
                 </LinearGradient>
               </View>
@@ -323,11 +344,7 @@ export default function RegisterScreen() {
                     <FloatInput label="Company Name" icon="business-outline" value={value} onChangeText={onChange} onBlur={onBlur} autoCapitalize="words" error={error?.message} />
                   )}
                 />
-                <View style={s.inputSeparator}>
-                  <View style={s.inputSepLine} />
-                  <Ionicons name="globe-outline" size={11} color="#C5CDD8" style={{ marginHorizontal: 8 }} />
-                  <View style={s.inputSepLine} />
-                </View>
+                <View style={s.inputGap} />
                 <Controller
                   control={control}
                   name="timezone"
@@ -354,11 +371,7 @@ export default function RegisterScreen() {
                     <FloatInput label="Full Name" icon="person-outline" value={value} onChangeText={onChange} onBlur={onBlur} autoCapitalize="words" error={error?.message} />
                   )}
                 />
-                <View style={s.inputSeparator}>
-                  <View style={s.inputSepLine} />
-                  <Ionicons name="mail-outline" size={11} color="#C5CDD8" style={{ marginHorizontal: 8 }} />
-                  <View style={s.inputSepLine} />
-                </View>
+                <View style={s.inputGap} />
                 <Controller
                   control={control}
                   name="adminEmail"
@@ -370,11 +383,7 @@ export default function RegisterScreen() {
                     <FloatInput label="Work Email Address" icon="mail-outline" value={value} onChangeText={onChange} onBlur={onBlur} keyboardType="email-address" error={error?.message} />
                   )}
                 />
-                <View style={s.inputSeparator}>
-                  <View style={s.inputSepLine} />
-                  <Ionicons name="lock-closed-outline" size={11} color="#C5CDD8" style={{ marginHorizontal: 8 }} />
-                  <View style={s.inputSepLine} />
-                </View>
+                <View style={s.inputGap} />
                 <Controller
                   control={control}
                   name="adminPassword"
@@ -397,7 +406,7 @@ export default function RegisterScreen() {
           {step === 0 ? (
             <TouchableOpacity style={s.loginBtn} onPress={handleNext} activeOpacity={0.85}>
               <View style={s.loginBtnClip}>
-                <LinearGradient colors={[C.accentBright, C.teal]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.loginBtnGradient}>
+                <LinearGradient colors={['#4A8CF7', '#2563EB']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.loginBtnGradient}>
                   <View style={s.loginBtnInner}>
                     <Text style={s.loginBtnText}>Continue</Text>
                     <View style={s.loginBtnArrow}>
@@ -415,7 +424,7 @@ export default function RegisterScreen() {
               activeOpacity={0.85}
             >
               <View style={s.loginBtnClip}>
-                <LinearGradient colors={[C.accentBright, C.teal]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.loginBtnGradient}>
+                <LinearGradient colors={['#4A8CF7', '#2563EB']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.loginBtnGradient}>
                   {isSubmitting ? (
                     <ActivityIndicator color={C.white} />
                   ) : (
@@ -473,43 +482,43 @@ const s = StyleSheet.create({
   statDivider: { width: 1, height: 12, backgroundColor: 'rgba(255,255,255,0.15)', marginHorizontal: 10 },
   cardOuter: { flex: 1, marginTop: -CARD_R },
   scrollContent: { flexGrow: 1 },
-  card: { backgroundColor: C.offWhite, borderTopLeftRadius: CARD_R, borderTopRightRadius: CARD_R, paddingHorizontal: 22, paddingBottom: 8, minHeight: '100%' },
+  card: { backgroundColor: '#F3F6FD', borderTopLeftRadius: CARD_R, borderTopRightRadius: CARD_R, paddingHorizontal: 22, paddingBottom: 12, minHeight: '100%' , overflow: 'hidden' },
+  waves: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 170, overflow: 'hidden' },
   handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#DDE3EE', alignSelf: 'center', marginTop: 12, marginBottom: 20 },
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 },
   cardTitle: { fontSize: 22, fontWeight: '800', color: C.navy, letterSpacing: -0.4, fontFamily: Platform.OS === 'android' ? 'sans-serif-black' : undefined },
   cardSubtitle: { fontSize: 12, color: '#8A9BB5', marginTop: 3, lineHeight: 17 },
-  cardAvatarRing: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, borderColor: 'rgba(91,163,245,0.25)', padding: 2 },
+  cardAvatarRing: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, borderColor: 'rgba(74,140,247,0.22)', padding: 2 },
   cardAvatarClip: { flex: 1, borderRadius: 20, overflow: 'hidden' },
   cardAvatar: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   stepDot: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#EEF2F8', borderWidth: 1.5, borderColor: '#D8E0EC', alignItems: 'center', justifyContent: 'center' },
   stepDotActive: { backgroundColor: C.accentBright, borderColor: C.accentBright },
-  stepDotDone: { backgroundColor: C.teal, borderColor: C.teal },
+  stepDotDone: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
   stepDotText: { fontSize: 10, fontWeight: '700', color: '#A0AEC0' },
   stepLine: { flex: 1, height: 2, backgroundColor: '#EEF2F8', marginHorizontal: 6 },
-  stepLineDone: { backgroundColor: C.teal },
+  stepLineDone: { backgroundColor: '#2563EB' },
   apiErrorBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF0F0', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 14, gap: 7, borderLeftWidth: 3, borderLeftColor: C.errorRed },
   apiErrorText: { fontSize: 12, color: C.errorRed, flex: 1 },
-  inputsCard: { backgroundColor: C.white, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6, marginBottom: 14, shadowColor: C.navy, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#EEF2F8' },
-  inputSeparator: { flexDirection: 'row', alignItems: 'center', marginVertical: 1 },
-  inputSepLine: { flex: 1, height: 1, backgroundColor: '#F0F3F8' },
-  inputWrap: { marginVertical: 5 },
-  inputShadow: { borderRadius: 10 },
-  inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.white, borderWidth: 0, borderRadius: 10, minHeight: 58, overflow: 'hidden' },
-  inputBoxFocused: { backgroundColor: '#F8FBFF' },
-  inputIconStrip: { width: 42, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F9FD', borderRightWidth: 1, borderRightColor: '#EEF2F8', marginRight: 10 },
-  inputIconStripActive: { backgroundColor: '#EEF6FF', borderRightColor: 'rgba(91,163,245,0.25)' },
-  inputInner: { flex: 1, paddingTop: 16, paddingRight: 4 },
+  inputsCard: { backgroundColor: 'transparent', borderRadius: 0, paddingHorizontal: 0, paddingVertical: 0, marginBottom: 14, borderWidth: 0 },
+  inputGap: { height: 4 },
+  inputWrap: { marginVertical: 7 },
+  inputShadow: { borderRadius: 14, backgroundColor: C.white, shadowColor: C.navy, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.045, shadowRadius: 5, elevation: 2 },
+  inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.white, borderWidth: 1, borderRadius: 14, minHeight: 70, overflow: 'hidden', borderColor: '#DCE7FC' },
+  inputBoxFocused: { backgroundColor: '#FBFDFF' },
+  inputIconStrip: { width: 44, height: 44, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', backgroundColor: '#EAF1FD', borderRadius: 11, marginLeft: 12, marginRight: 12 },
+  inputIconStripActive: { backgroundColor: '#DCE9FD' },
+  inputInner: { flex: 1, paddingTop: 16, paddingRight: 4, minHeight: 58, justifyContent: 'center' },
   floatLabel: { position: 'absolute', left: 0 },
-  inputText: { fontSize: 14, color: C.navy, paddingVertical: 2, fontWeight: '500' },
-  eyeBtn: { padding: 11, alignSelf: 'stretch', justifyContent: 'center' },
+  inputText: { fontSize: 14, color: C.navy, paddingVertical: 3, fontWeight: '500' },
+  eyeBtn: { padding: 12, alignSelf: 'stretch', justifyContent: 'center' },
   checkBadge: { width: 16, height: 16, borderRadius: 8, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, marginLeft: 2 },
   errorText: { fontSize: 11, color: C.errorRed },
-  loginBtn: { borderRadius: 14, marginBottom: 4 },
+  loginBtn: { borderRadius: 14, marginBottom: 4, marginTop: 2 },
   loginBtnDisabled: { opacity: 0.6 },
   loginBtnClip: { borderRadius: 14, overflow: 'hidden' },
-  loginBtnGradient: { paddingVertical: 14, paddingHorizontal: 22 },
+  loginBtnGradient: { paddingVertical: 16, paddingHorizontal: 22 },
   loginBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   loginBtnText: { fontSize: 15, fontWeight: '700', color: C.white, letterSpacing: 0.3 },
   loginBtnArrow: { width: 26, height: 26, borderRadius: 13, backgroundColor: C.white, alignItems: 'center', justifyContent: 'center', marginLeft: 9 },
@@ -517,5 +526,5 @@ const s = StyleSheet.create({
   backLinkText: { fontSize: 12, color: '#8A9BB5' },
   footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 16 },
   footerNote: { fontSize: 11, color: '#A0AEC0' },
-  registerLink: { fontSize: 12, fontWeight: '700', color: C.teal },
+  registerLink: { fontSize: 12, fontWeight: '700', color: '#2563EB' },
 });

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAdminDashboard } from '@/hooks/useAdminDashboard';
+import { formatDateDMY } from '@/lib/datetime';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { AdminSelfAttendance } from '@/features/attendance/components/AdminSelfAttendance';
 
@@ -180,7 +181,7 @@ export default function AdminHome() {
             <View>
               <Text style={s.title}>Command Center</Text>
               <Text style={s.date}>
-                {new Date().toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                {formatDateDMY(new Date(), 'EEE, dd MMM yyyy')}
               </Text>
             </View>
             <TouchableOpacity style={s.avatarBtn} onPress={() => router.push('/(admin)/profile')}>

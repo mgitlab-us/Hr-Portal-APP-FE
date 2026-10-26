@@ -33,6 +33,7 @@ export default function AdminProfileScreen() {
   const { employee, clearAuth } = useAuthStore();
   const insets = useSafeAreaInsets();
   const avatarLetter = employee?.name?.[0]?.toUpperCase() || 'A';
+  const isSuperAdmin = employee?.role === 'SUPER_ADMIN';
 
   const handleLogout = async () => {
     await secureStorage.removeTokens();
@@ -102,8 +103,12 @@ export default function AdminProfileScreen() {
               <SettingRow icon="people-outline" label="Team Directory" color={C.accent} onPress={() => router.push('/(admin)/employees')} />
               <View style={s.divider} />
               <SettingRow icon="person-add-outline" label="Add Employee" color={C.teal} onPress={() => router.push('/(admin)/create-employee')} />
-              <View style={s.divider} />
-              <SettingRow icon="time-outline" label="Shift Settings" color="#2563EB" onPress={() => router.push('/(admin)/shift-settings')} />
+              {isSuperAdmin && (
+                <>
+                  <View style={s.divider} />
+                  <SettingRow icon="time-outline" label="Shift Settings" color="#2563EB" onPress={() => router.push('/(admin)/shift-settings')} />
+                </>
+              )}
               <View style={s.divider} />
               <SettingRow icon="calendar-outline" label="Leave Approvals" color="#7C5CBF" onPress={() => router.push('/(admin)/leave-approvals')} />
               <View style={s.divider} />

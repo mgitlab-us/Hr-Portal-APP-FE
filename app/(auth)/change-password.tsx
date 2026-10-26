@@ -6,6 +6,7 @@ import {
 import { useForm, Controller } from 'react-hook-form';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { ChangePasswordInput } from '@/types';
 import { authApi } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/store';
@@ -15,18 +16,19 @@ const { width } = Dimensions.get('window');
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
-  navy: '#0F1D3A',
-  navyMid: '#162447',
-  navyLight: '#1E3A6E',
-  accent: '#4A90D9',
-  accentBright: '#5BA3F5',
-  teal: '#1DB8A0',
+  navy: '#0B1736',
+  navyMid: '#0F2152',
+  navyLight: '#16348A',
+  accent: '#2F66E8',
+  accentBright: '#4C8DF7',
+  blue: '#2F66E8',
+  teal: '#2F66E8',
   white: '#FFFFFF',
-  offWhite: '#F7F9FC',
-  inputBg: 'rgba(255,255,255,0.08)',
-  inputBorder: 'rgba(255,255,255,0.18)',
-  placeholder: 'rgba(255,255,255,0.45)',
-  textDim: 'rgba(255,255,255,0.65)',
+  offWhite: '#F3F6FD',
+  inputBg: '#FFFFFF',
+  inputBorder: '#DCE6FA',
+  placeholder: '#7C90B7',
+  textDim: '#6E84AE',
   errorRed: '#FF6B6B',
 };
 
@@ -166,6 +168,19 @@ export default function ChangePasswordScreen() {
         style={styles.cardOuter}
       >
         <Animated.View style={[styles.card, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
+          <LinearGradient
+            colors={['#F7F9FE', '#F3F6FD', '#E9F0FC']}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+          {/* Smooth blue waves matching the TapIn login and registration screens. */}
+          <View style={styles.waves} pointerEvents="none">
+            <Svg width="100%" height="100%" viewBox="0 0 400 180" preserveAspectRatio="none">
+              <Path d="M0 58 C58 48 118 30 184 30 C244 30 264 78 310 80 C346 81 375 49 400 42 L400 180 L0 180 Z" fill="#DCE9FC" opacity={0.88} />
+              <Path d="M0 92 C70 104 132 124 205 143 C278 162 338 126 400 105 L400 180 L0 180 Z" fill="#C9DDFB" opacity={0.48} />
+              <Path d="M0 132 C72 112 126 121 190 145 C262 172 329 167 400 143 L400 180 L0 180 Z" fill="#EAF2FF" opacity={0.72} />
+            </Svg>
+          </View>
           <Text style={styles.cardTitle}>Set New Password</Text>
           <Text style={styles.cardSubtitle}>
             {isForceReset
@@ -226,7 +241,7 @@ export default function ChangePasswordScreen() {
             activeOpacity={0.85}
           >
             <LinearGradient
-              colors={[C.accentBright, C.teal]}
+              colors={['#4A8CF7', '#3A5FD9']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.submitBtnGradient}
@@ -249,16 +264,17 @@ export default function ChangePasswordScreen() {
 
 const CARD_RADIUS = 28;
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.offWhite },
-  header: { paddingTop: 60, paddingHorizontal: 28, paddingBottom: 60 },
+  root: { flex: 1, backgroundColor: '#F3F6FD' },
+  header: { paddingTop: 60, paddingHorizontal: 28, paddingBottom: 60, overflow: 'hidden' },
   brandRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   logoBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   brandName: { fontSize: 16, fontWeight: '700', color: C.white, letterSpacing: 0.5 },
   headerTitle: { fontSize: 32, fontWeight: '800', color: C.white, letterSpacing: -0.5 },
   headerSub: { fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 4 },
-  cardOuter: { flex: 1, marginTop: -CARD_RADIUS },
-  card: { flex: 1, backgroundColor: C.offWhite, borderTopLeftRadius: CARD_RADIUS, borderTopRightRadius: CARD_RADIUS, paddingHorizontal: 28, paddingTop: 32 },
-  cardTitle: { fontSize: 22, fontWeight: '800', color: C.navy },
+  cardOuter: { flex: 1, marginTop: -CARD_RADIUS, marginBottom: -64 },
+  card: { flex: 1, backgroundColor: '#F3F6FD', borderTopLeftRadius: CARD_RADIUS, borderTopRightRadius: CARD_RADIUS, paddingHorizontal: 28, paddingTop: 32, overflow: 'hidden' },
+  waves: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 210, overflow: 'hidden' },
+  cardTitle: { fontSize: 22, fontWeight: '800', color: '#0B1B45' },
   cardSubtitle: { fontSize: 14, color: '#8A9BB5', marginTop: 4, marginBottom: 28 },
   apiErrorBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF0F0', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 20, gap: 8, borderLeftWidth: 3, borderLeftColor: C.errorRed },
   apiErrorText: { fontSize: 13, color: C.errorRed, flex: 1 },

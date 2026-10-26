@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { useTodayAttendance } from '../hooks';
 import { CheckInButton } from './CheckInButton';
 import { BreakButton } from './BreakButton';
-import { format, parseISO, addMinutes } from 'date-fns';
+import { addMinutes } from 'date-fns';
+import { formatTime12h } from '@/lib/datetime';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -32,10 +33,10 @@ export function AdminSelfAttendance() {
     
     const baseDate = new Date();
     baseDate.setHours(h, m, 0, 0);
-    const checkin12h = format(baseDate, 'hh:mm a');
+    const checkin12h = formatTime12h(baseDate);
     
     const shiftEnd = addMinutes(baseDate, workMinutes + 60); 
-    const checkoutTimeStr = format(shiftEnd, 'hh:mm a');
+    const checkoutTimeStr = formatTime12h(shiftEnd);
 
     const workingHoursDisplay = record.dailySummary?.totalWorkMinutes
       ? `${Math.floor(record.dailySummary.totalWorkMinutes / 60)}h ${record.dailySummary.totalWorkMinutes % 60}m`
@@ -80,8 +81,8 @@ export function AdminSelfAttendance() {
       <View style={s.content}>
         <CheckInButton
           status={record.status || 'IDLE'}
-          checkinTime={record.checkinTime ? format(parseISO(record.checkinTime), 'hh:mm a') : null}
-          checkoutTime={record.checkoutTime ? format(parseISO(record.checkoutTime), 'hh:mm a') : null}
+          checkinTime={record.checkinTime ? formatTime12h(record.checkinTime) : null}
+          checkoutTime={record.checkoutTime ? formatTime12h(record.checkoutTime) : null}
           workingHours={processedData?.workingHoursDisplay}
           onRefresh={refetch}
         />

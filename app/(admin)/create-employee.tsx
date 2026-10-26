@@ -2,13 +2,15 @@ import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, KeyboardAvoidingView, Platform,
-  StatusBar, TextInput,
+  StatusBar, TextInput, Modal, Share,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { employeeApi } from '@/features/employees/api';
-import { shiftsApi, ShiftProfile } from '@/features/shifts/api';
+import { ShiftProfile } from '@/features/shifts/api';
 import { useShifts } from '@/hooks/useShifts';
+import { useAuthStore } from '@/features/auth/store';
+import { formatDateDMY, parseDMY } from '@/lib/datetime';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -74,44 +76,116 @@ const f = StyleSheet.create({
 export default function CreateEmployeeScreen() {
   const [loadingSubmit, setLoadingSubmit] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [createdCreds, setCreatedCreds] = useState<{
+    name: string;
+    email: string;
+    password: string;
+    employeeCode: string;
+  } | null>(null);
   const { shifts, loading: shiftsLoading } = useShifts();
+  const { employee } = useAuthStore();
+  const isSuperAdmin = employee?.role === 'SUPER_ADMIN';
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
   const insets = useSafeAreaInsets();
   const bottomPad = 114 + insets.bottom + 16;
 
-  const { control, handleSubmit, formState: { errors }, watch, setValue, setError } = useForm({
+  const { control, handleSubmit, formState: { errors }, watch, setValue, setError, reset } = useForm({
     defaultValues: {
-      name: '', email: '', employeeCode: '',
-      designation: '', department: '',
-      joiningDate: '', role: 'EMPLOYEE', shiftProfileId: '',
+      name: '', email: '', phone: '', employeeCode: '',
+      designation: '', departmentId: '',
+      joiningDate: formatDateDMY(new Date()), role: 'EMPLOYEE', shiftProfileId: '',
     },
   });
 
-  const watchedDepartment = watch('department');
+  const watchedDepartmentId = watch('departmentId');
   const watchedDesignation = watch('designation');
+  const selectedDepartment = departments.find((dept) => dept.id === watchedDepartmentId);
+
+  useEffect(() => {
+    let mounted = true;
+    employeeApi
+      .listDepartments()
+      .then((result) => {
+        if (!mounted) return;
+        setDepartments(result);
+      })
+      .catch(() => {
+        if (mounted) setApiError('Could not load departments for your account.');
+      })
+      .finally(() => {
+        if (mounted) setDepartmentsLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
     const timer = setTimeout(async () => {
       try {
-        const { employeeCode } = await employeeApi.suggestCode(watchedDepartment, watchedDesignation);
+        const { employeeCode } = await employeeApi.suggestCode(
+          selectedDepartment?.name,
+          watchedDesignation
+        );
         if (mounted) setValue('employeeCode', employeeCode);
       } catch { }
     }, 300);
     return () => { mounted = false; clearTimeout(timer); };
-  }, [watchedDepartment, watchedDesignation, setValue]);
+  }, [selectedDepartment?.name, watchedDesignation, setValue]);
+
+  const generateTempPassword = () => {
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghjkmnpqrstuvwxyz';
+    const digits = '23456789';
+    const special = '@#!$';
+    const all = upper + lower + digits + special;
+    const rand = (s: string) => s[Math.floor(Math.random() * s.length)];
+    const base = rand(upper) + rand(lower) + rand(digits) + rand(special);
+    const rest = Array.from({ length: 6 }, () => rand(all)).join('');
+    return (base + rest).split('').sort(() => Math.random() - 0.5).join('');
+  };
+
+  const handleShare = async () => {
+    if (!createdCreds) return;
+    try {
+      await Share.share({
+        message: `Welcome to TapIn HR Portal!\n\nHere are your login credentials:\n👤 Name: ${createdCreds.name}\n🆔 Employee ID: ${createdCreds.employeeCode}\n📧 Email: ${createdCreds.email}\n🔑 Temporary Password: ${createdCreds.password}\n\nPlease sign in and update your password on your first login.`,
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const onSubmit = async (data: any) => {
     setLoadingSubmit(true);
     setApiError(null);
+    const tempPassword = generateTempPassword();
     try {
+      const joiningDate = data.joiningDate ? parseDMY(data.joiningDate) : null;
       const payload = {
         ...data,
-        joiningDate: data.joiningDate
-          ? new Date(`${data.joiningDate}T00:00:00.000Z`).toISOString()
+        password: tempPassword,
+        mustChangePassword: true,
+        departmentId: data.departmentId || undefined,
+        joiningDate: joiningDate
+          ? new Date(
+              Date.UTC(
+                joiningDate.getFullYear(),
+                joiningDate.getMonth(),
+                joiningDate.getDate()
+              )
+            ).toISOString()
           : undefined,
       };
-      await employeeApi.create(payload);
-      router.back();
+      const res = await employeeApi.create(payload);
+      setCreatedCreds({
+        name: res?.name || data.name,
+        email: res?.email || data.email,
+        password: tempPassword,
+        employeeCode: res?.profile?.employeeCode || data.employeeCode || '—',
+      });
     } catch (e: any) {
       const msg = e.response?.data?.message || '';
       if (e.response?.status === 409 && msg.toLowerCase().includes('email')) {
@@ -183,6 +257,14 @@ export default function CreateEmployeeScreen() {
                   error={errors.email?.message} keyboardType="email-address" />
               )}
             />
+            <Controller control={control} name="phone"
+              rules={{ required: 'Mobile number is required', minLength: { value: 7, message: 'At least 7 digits' } }}
+              render={({ field: { onChange, value } }) => (
+                <StyledInput label="Mobile Number" icon="call-outline" value={value}
+                  onChangeText={onChange} placeholder="e.g. +1 555-0199"
+                  error={errors.phone?.message} keyboardType="phone-pad" />
+              )}
+            />
 
             <View style={s.divider} />
             <Text style={s.cardSection}>Work Profile</Text>
@@ -193,12 +275,57 @@ export default function CreateEmployeeScreen() {
                   onChangeText={onChange} placeholder="e.g. Software Engineer" />
               )}
             />
-            <Controller control={control} name="department"
-              render={({ field: { onChange, value } }) => (
-                <StyledInput label="Department" icon="business-outline" value={value}
-                  onChangeText={onChange} placeholder="e.g. Engineering" />
-              )}
-            />
+            <View style={f.group}>
+              <View style={s.labelRow}>
+                <Text style={f.label}>Department</Text>
+                {departmentsLoading && <ActivityIndicator size="small" color={C.accent} />}
+              </View>
+              <Controller control={control} name="departmentId"
+                rules={{ required: 'Select the employee department' }}
+                render={({ field: { onChange, value } }) => (
+                  <>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={s.shiftRow}
+                    >
+                      {departments.map((dept) => {
+                        const active = value === dept.id;
+                        return (
+                          <TouchableOpacity
+                            key={dept.id}
+                            style={[s.shiftCard, active && s.shiftCardActive]}
+                            onPress={() => onChange(dept.id)}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons
+                              name="business-outline"
+                              size={16}
+                              color={active ? C.accent : C.muted}
+                            />
+                            <Text style={[s.shiftName, active && s.shiftNameActive]}>
+                              {dept.name}
+                            </Text>
+                            <Text style={s.shiftMeta}>
+                              {active ? 'Selected department' : 'Assign to this team'}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                    {departments.length === 0 && !departmentsLoading && (
+                      <Text style={f.hint}>
+                        No departments are available for your account. Ask the Super Admin to
+                        assign you a department first.
+                      </Text>
+                    )}
+                    {errors.departmentId && (
+                      <Text style={f.error}>{String(errors.departmentId.message)}</Text>
+                    )}
+                  </>
+                )}
+              />
+            </View>
             <Controller control={control} name="employeeCode"
               rules={{
                 pattern: {
@@ -229,10 +356,13 @@ export default function CreateEmployeeScreen() {
               )}
             />
             <Controller control={control} name="joiningDate"
-              rules={{ validate: (v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(v) || 'Use format YYYY-MM-DD' }}
+              rules={{
+                validate: (v) =>
+                  !v || /^\d{2}-\d{2}-\d{4}$/.test(v) || 'Use format DD-MM-YYYY',
+              }}
               render={({ field: { onChange, value } }) => (
                 <StyledInput label="Joining Date" icon="calendar-outline" value={value}
-                  onChangeText={onChange} placeholder="YYYY-MM-DD (optional)"
+                  onChangeText={onChange} placeholder="DD-MM-YYYY"
                   error={errors.joiningDate?.message} />
               )}
             />
@@ -246,7 +376,7 @@ export default function CreateEmployeeScreen() {
               <Controller control={control} name="role"
                 render={({ field: { onChange, value } }) => (
                   <View style={s.rolePicker}>
-                    {['EMPLOYEE', 'ADMIN', 'SUPER_ADMIN'].map((r) => (
+                    {(isSuperAdmin ? ['EMPLOYEE', 'ADMIN', 'SUPER_ADMIN'] : ['EMPLOYEE']).map((r) => (
                       <TouchableOpacity
                         key={r}
                         style={[s.rolePill, value === r && s.rolePillActive]}
@@ -265,51 +395,66 @@ export default function CreateEmployeeScreen() {
 
             <View style={s.divider} />
 
-            {/* Shift picker */}
+            {/* Shift picker — company templates are Super Admin only */}
             <View style={f.group}>
               <View style={s.labelRow}>
                 <Text style={f.label}>Work Schedule</Text>
-                {shiftsLoading && <ActivityIndicator size="small" color={C.accent} />}
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.shiftRow}>
-                <TouchableOpacity
-                  style={[s.shiftCard, !watch('shiftProfileId') && s.shiftCardActive]}
-                  onPress={() => setValue('shiftProfileId', '')}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="business" size={16}
-                    color={!watch('shiftProfileId') ? C.accent : C.muted} />
-                  <Text style={[s.shiftName, !watch('shiftProfileId') && s.shiftNameActive]}>
-                    Default
-                  </Text>
-                  <Text style={s.shiftMeta}>Base policy</Text>
-                </TouchableOpacity>
-
-                {shifts.map((shift: ShiftProfile) => {
-                  const checkin = `${String(shift.expectedCheckinHour).padStart(2, '0')}:${String(shift.expectedCheckinMinute).padStart(2, '0')}`;
-                  const durationH = Math.floor(shift.workMinutesPerDay / 60);
-                  const durationM = shift.workMinutesPerDay % 60;
-                  const active = watch('shiftProfileId') === shift.id;
-                  return (
-                    <TouchableOpacity
-                      key={shift.id}
-                      style={[s.shiftCard, active && s.shiftCardActive]}
-                      onPress={() => setValue('shiftProfileId', shift.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="time" size={16} color={active ? C.accent : C.muted} />
-                      <Text style={[s.shiftName, active && s.shiftNameActive]}>{shift.name}</Text>
-                      <Text style={s.shiftMeta}>{checkin}  ·  {durationH}h{durationM > 0 ? ` ${durationM}m` : ''}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-
-                {shifts.length === 0 && !shiftsLoading && (
-                  <View style={s.emptyShift}>
-                    <Text style={s.emptyShiftText}>No custom shifts</Text>
-                  </View>
+                {isSuperAdmin && shiftsLoading && (
+                  <ActivityIndicator size="small" color={C.accent} />
                 )}
-              </ScrollView>
+              </View>
+
+              {!isSuperAdmin ? (
+                <View style={s.inheritNote}>
+                  <Ionicons name="git-branch-outline" size={16} color={C.accent} />
+                  <Text style={s.inheritNoteText}>
+                    The selected department&apos;s shift rule is applied automatically. No
+                    employee-by-employee setup is needed.
+                  </Text>
+                </View>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.shiftRow}>
+                  <TouchableOpacity
+                    style={[s.shiftCard, !watch('shiftProfileId') && s.shiftCardActive]}
+                    onPress={() => setValue('shiftProfileId', '')}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="business" size={16}
+                      color={!watch('shiftProfileId') ? C.accent : C.muted} />
+                    <Text style={[s.shiftName, !watch('shiftProfileId') && s.shiftNameActive]}>
+                      Default
+                    </Text>
+                    <Text style={s.shiftMeta}>Base policy</Text>
+                  </TouchableOpacity>
+
+                  {shifts.map((shift: ShiftProfile) => {
+                    const hour12 = shift.expectedCheckinHour % 12 || 12;
+                    const period = shift.expectedCheckinHour >= 12 ? 'PM' : 'AM';
+                    const checkin = `${hour12}:${String(shift.expectedCheckinMinute).padStart(2, '0')} ${period}`;
+                    const durationH = Math.floor(shift.workMinutesPerDay / 60);
+                    const durationM = shift.workMinutesPerDay % 60;
+                    const active = watch('shiftProfileId') === shift.id;
+                    return (
+                      <TouchableOpacity
+                        key={shift.id}
+                        style={[s.shiftCard, active && s.shiftCardActive]}
+                        onPress={() => setValue('shiftProfileId', shift.id)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="time" size={16} color={active ? C.accent : C.muted} />
+                        <Text style={[s.shiftName, active && s.shiftNameActive]}>{shift.name}</Text>
+                        <Text style={s.shiftMeta}>{checkin}  ·  {durationH}h{durationM > 0 ? ` ${durationM}m` : ''}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+
+                  {shifts.length === 0 && !shiftsLoading && (
+                    <View style={s.emptyShift}>
+                      <Text style={s.emptyShiftText}>No custom shifts</Text>
+                    </View>
+                  )}
+                </ScrollView>
+              )}
             </View>
           </View>
 
@@ -336,6 +481,68 @@ export default function CreateEmployeeScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ── Credentials Share Modal ── */}
+      {createdCreds && (
+        <Modal visible={true} transparent={true} animationType="fade">
+          <View style={credStyles.overlay}>
+            <View style={credStyles.card}>
+              <View style={credStyles.iconCircle}>
+                <Ionicons name="checkmark-circle" size={44} color="#10B981" />
+              </View>
+              <Text style={credStyles.title}>Employee Created!</Text>
+              <Text style={credStyles.subtitle}>Temporary credentials generated</Text>
+
+              <View style={credStyles.detailsBox}>
+                <View style={credStyles.row}>
+                  <Text style={credStyles.detailLabel}>Name</Text>
+                  <Text style={credStyles.detailValue}>{createdCreds.name}</Text>
+                </View>
+                <View style={credStyles.row}>
+                  <Text style={credStyles.detailLabel}>Email</Text>
+                  <Text style={credStyles.detailValue}>{createdCreds.email}</Text>
+                </View>
+                <View style={credStyles.row}>
+                  <Text style={credStyles.detailLabel}>Employee ID</Text>
+                  <Text style={credStyles.detailValue}>{createdCreds.employeeCode}</Text>
+                </View>
+                <View style={[credStyles.row, { borderBottomWidth: 0 }]}>
+                  <Text style={credStyles.detailLabel}>Temp Password</Text>
+                  <Text style={[credStyles.detailValue, credStyles.passwordText]}>
+                    {createdCreds.password}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity onPress={handleShare} style={credStyles.shareBtn}>
+                <Ionicons name="share-social-outline" size={18} color="#FFFFFF" />
+                <Text style={credStyles.shareBtnText}>Share Credentials</Text>
+              </TouchableOpacity>
+
+              <View style={credStyles.actionRow}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setCreatedCreds(null);
+                    reset();
+                  }}
+                  style={credStyles.secondaryBtn}
+                >
+                  <Text style={credStyles.secondaryBtnText}>Add Another</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setCreatedCreds(null);
+                    router.back();
+                  }}
+                  style={credStyles.primaryBtn}
+                >
+                  <Text style={credStyles.primaryBtnText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -451,6 +658,17 @@ const s = StyleSheet.create({
   shiftMeta: { fontSize: 11, color: C.muted },
   emptyShift: { padding: 16, backgroundColor: C.bg, borderRadius: 12, minWidth: 160, alignItems: 'center', justifyContent: 'center' },
   emptyShiftText: { color: C.muted, fontSize: 12 },
+  inheritNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#BFDBFE',
+  },
+  inheritNoteText: { flex: 1, fontSize: 11.5, lineHeight: 17, color: '#1D4ED8', fontWeight: '500' },
 
   // ── Submit button
   submitBtn: {
@@ -484,4 +702,136 @@ const s = StyleSheet.create({
     borderColor: '#FECACA',
   },
   errorBannerText: { color: '#EF4444', fontSize: 12, fontWeight: '600', flex: 1 },
+});
+
+const credStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 29, 58, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  iconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#ECFDF5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F1D3A',
+    letterSpacing: -0.3,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+    marginBottom: 18,
+  },
+  detailsBox: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 20,
+    gap: 12,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  detailValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F1D3A',
+  },
+  passwordText: {
+    color: '#2563EB',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  shareBtn: {
+    width: '100%',
+    backgroundColor: '#2563EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 8,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 10,
+  },
+  shareBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  actionRow: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  secondaryBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  primaryBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#0F1D3A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
 });

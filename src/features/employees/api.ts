@@ -9,6 +9,10 @@ export const employeeApi = {
     const res = await apiClient.post('/employees', data);
     return res.data;
   },
+  listDepartments: async () => {
+    const res = await apiClient.get('/departments');
+    return res.data as { id: string; name: string }[];
+  },
   suggestCode: async (department?: string, designation?: string) => {
     const params: string[] = [];
     if (department) params.push(`department=${encodeURIComponent(department)}`);

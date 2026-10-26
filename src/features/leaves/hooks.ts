@@ -8,6 +8,13 @@ export function useMyLeaves() {
   });
 }
 
+export function useMyLeaveBalances() {
+  return useQuery({
+    queryKey: ['leaves', 'balances'],
+    queryFn: leavesApi.getMyBalances,
+  });
+}
+
 export function useAdminPendingLeaves() {
   return useQuery({
     queryKey: ['leaves', 'admin', 'pending'],

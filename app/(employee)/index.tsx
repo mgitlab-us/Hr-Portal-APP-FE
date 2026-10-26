@@ -10,7 +10,8 @@ import { useAuthStore } from '@/features/auth/store';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTodayAttendance } from '@/features/attendance/hooks';
-import { format, parseISO, addMinutes } from 'date-fns';
+import { addMinutes } from 'date-fns';
+import { formatTime12h } from '@/lib/datetime';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ensurePermissions } from '@/lib/locationService';
 import { TAB_BAR_HEIGHT } from '@/components/CustomTabBar';
@@ -75,10 +76,10 @@ export default function EmployeeHome() {
 
     const baseDate = new Date();
     baseDate.setHours(h, m, 0, 0);
-    const checkin12h = format(baseDate, 'hh:mm a');
+    const checkin12h = formatTime12h(baseDate);
 
     const shiftEnd = addMinutes(baseDate, totalShiftMinutes);
-    const checkoutTimeStr = format(shiftEnd, 'hh:mm a');
+    const checkoutTimeStr = formatTime12h(shiftEnd);
 
     const workingHoursDisplay = record.dailySummary?.totalWorkMinutes
       ? `${Math.floor(record.dailySummary.totalWorkMinutes / 60)}h ${record.dailySummary.totalWorkMinutes % 60}m`
@@ -138,8 +139,8 @@ export default function EmployeeHome() {
             <AnimatedStatusView status={record?.status || 'IDLE'}>
               <CheckInButton
                 status={record?.status || 'IDLE'}
-                checkinTime={record?.checkinTime ? format(parseISO(record.checkinTime), 'hh:mm a') : null}
-                checkoutTime={record?.checkoutTime ? format(parseISO(record.checkoutTime), 'hh:mm a') : null}
+                checkinTime={record?.checkinTime ? formatTime12h(record.checkinTime) : null}
+                checkoutTime={record?.checkoutTime ? formatTime12h(record.checkoutTime) : null}
                 workingHours={processedData?.workingHoursDisplay}
                 onRefresh={refetch}
               />

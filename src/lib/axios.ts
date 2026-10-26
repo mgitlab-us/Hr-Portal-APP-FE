@@ -3,7 +3,13 @@ import { secureStorage } from './secureStorage';
 import { router } from 'expo-router';
 import { useAuthStore } from '@/features/auth/store';
 
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || '';
+import { Platform } from 'react-native';
+
+const rawUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+export const API_URL =
+  Platform.OS === 'android' && rawUrl.includes('localhost')
+    ? rawUrl.replace('localhost', '10.0.2.2')
+    : rawUrl;
 
 export const apiClient = axios.create({
   baseURL: API_URL,

@@ -11,7 +11,7 @@ interface NoticeCardProps {
 
 export function NoticeCard({ notice, onPress }: NoticeCardProps) {
   const meta = NOTICE_TYPE_META[notice.type] ?? NOTICE_TYPE_META.ANNOUNCEMENT;
-  const postedAt = formatNoticeDate(notice.createdAt, 'MMM dd · hh:mm a');
+  const postedAt = formatNoticeDate(notice.createdAt, 'dd MMM yyyy · hh:mm a');
 
   return (
     <TouchableOpacity

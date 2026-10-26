@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useCreateLeave } from '@/features/leaves/hooks';
+import { useCreateLeave, useMyLeaveBalances } from '@/features/leaves/hooks';
 // Defensive import for DateTimePicker to prevent top-level crash
 let DateTimePicker: any = null;
 try {
@@ -10,13 +10,25 @@ try {
 } catch (e) {
   console.warn('DateTimePicker native module not found');
 }
-import { format } from 'date-fns';
+import { formatDateDMY, parseDMY } from '@/lib/datetime';
 
-const LEAVE_TYPES = ['CASUAL', 'SICK', 'VACATION', 'OTHER'];
+const LEAVE_TYPES = [
+  { key: 'CASUAL', label: 'Casual' },
+  { key: 'SICK', label: 'Sick' },
+  { key: 'VACATION', label: 'Annual / Vacation' },
+  { key: 'OTHER', label: 'Other / Unpaid' },
+];
+
+function formatCycleDate(value?: string) {
+  if (!value) return '';
+  const [year, month, day] = value.split('-').map(Number);
+  return formatDateDMY(new Date(year, month - 1, day));
+}
 
 function RequestLeaveScreen() {
   const router = useRouter();
   const createLeave = useCreateLeave();
+  const { data: balances, isLoading: loadingBalances } = useMyLeaveBalances();
 
   const [type, setType] = useState('CASUAL');
   const [startDate, setStartDate] = useState(new Date());
@@ -38,8 +50,9 @@ function RequestLeaveScreen() {
       });
       Alert.alert('Success', 'Leave request submitted!');
       router.back();
-    } catch (e) {
-      Alert.alert('Error', 'Failed to submit request');
+    } catch (e: any) {
+      const msg = e.response?.data?.message || 'Failed to submit request';
+      Alert.alert('Error', msg);
     }
   };
 
@@ -49,17 +62,79 @@ function RequestLeaveScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 20 }}>
 
+        {/* ── Leave Quota Balance Strip ── */}
+        <View className="mb-6 p-4 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0]">
+          <View className="flex-row items-center justify-between mb-1">
+            <Text className="text-[12px] font-bold text-[#64748B] uppercase tracking-wider">
+              {balances?.cycleStart
+                ? `${formatCycleDate(balances.cycleStart)} – ${formatCycleDate(balances.cycleEnd)}`
+                : `${new Date().getFullYear()} Leave Allowances`}
+            </Text>
+            {loadingBalances && <ActivityIndicator size="small" color="#5B6EF5" />}
+          </View>
+          <Text className="text-[10px] text-[#94A3B8] mb-3">
+            Your leave year starts on your joining anniversary. Unused days carry forward.
+          </Text>
+
+          <View className="flex-row gap-2">
+            <View className="flex-1 bg-white p-2.5 rounded-xl border border-[#E2E8F0] items-center">
+              <Text className="text-[11px] font-semibold text-[#64748B]">Casual</Text>
+              <Text className="text-base font-extrabold text-[#1E293B]">
+                {balances?.casual?.remaining ?? '—'}
+              </Text>
+              <Text className="text-[10px] text-[#94A3B8]">
+                of {balances?.casual?.total ?? '—'} left
+              </Text>
+              {(balances?.casual?.carryForward ?? 0) > 0 && (
+                <Text className="text-[9px] text-[#5B6EF5] font-semibold">
+                  +{balances?.casual?.carryForward} carried
+                </Text>
+              )}
+            </View>
+
+            <View className="flex-1 bg-white p-2.5 rounded-xl border border-[#E2E8F0] items-center">
+              <Text className="text-[11px] font-semibold text-[#64748B]">Sick</Text>
+              <Text className="text-base font-extrabold text-[#1E293B]">
+                {balances?.sick?.remaining ?? '—'}
+              </Text>
+              <Text className="text-[10px] text-[#94A3B8]">
+                of {balances?.sick?.total ?? '—'} left
+              </Text>
+              {(balances?.sick?.carryForward ?? 0) > 0 && (
+                <Text className="text-[9px] text-[#5B6EF5] font-semibold">
+                  +{balances?.sick?.carryForward} carried
+                </Text>
+              )}
+            </View>
+
+            <View className="flex-1 bg-white p-2.5 rounded-xl border border-[#E2E8F0] items-center">
+              <Text className="text-[11px] font-semibold text-[#64748B]">Annual</Text>
+              <Text className="text-base font-extrabold text-[#1E293B]">
+                {balances?.vacation?.remaining ?? '—'}
+              </Text>
+              <Text className="text-[10px] text-[#94A3B8]">
+                of {balances?.vacation?.total ?? '—'} left
+              </Text>
+              {(balances?.vacation?.carryForward ?? 0) > 0 && (
+                <Text className="text-[9px] text-[#5B6EF5] font-semibold">
+                  +{balances?.vacation?.carryForward} carried
+                </Text>
+              )}
+            </View>
+          </View>
+        </View>
+
         {/* Leave Type */}
         <View className="mb-6">
           <Text className="text-[13px] font-bold text-[#64748B] mb-2.5 uppercase tracking-wide">Leave Type</Text>
           <View className="flex-row flex-wrap gap-2">
             {LEAVE_TYPES.map(t => (
               <TouchableOpacity
-                key={t}
-                className={`px-3 py-2 rounded-xl border ${type === t ? 'bg-[#1C2840] border-[#1C2840]' : 'bg-[#F3F4F8] border-[#E5E9F2]'}`}
-                onPress={() => setType(t)}
+                key={t.key}
+                className={`px-3 py-2.5 rounded-xl border ${type === t.key ? 'bg-[#1C2840] border-[#1C2840]' : 'bg-[#F3F4F8] border-[#E5E9F2]'}`}
+                onPress={() => setType(t.key)}
               >
-                <Text className={`text-xs font-semibold ${type === t ? 'text-white' : 'text-[#1C2840]'}`}>{t}</Text>
+                <Text className={`text-xs font-semibold ${type === t.key ? 'text-white' : 'text-[#1C2840]'}`}>{t.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -73,7 +148,7 @@ function RequestLeaveScreen() {
             onPress={() => setShowStart(true)}
           >
             <Ionicons name="calendar-outline" size={20} color="#5B6EF5" />
-            <Text className="text-base font-semibold text-[#1C2840]">{format(startDate, 'PPP')}</Text>
+            <Text className="text-base font-semibold text-[#1C2840]">{formatDateDMY(startDate, 'dd MMMM yyyy')}</Text>
           </TouchableOpacity>
           {showStart && DateTimePicker && (
             <DateTimePicker
@@ -85,10 +160,10 @@ function RequestLeaveScreen() {
           {showStart && !DateTimePicker && (
             <TextInput
               className="p-3 bg-[#FEF2F2] rounded-xl mt-2 text-base font-bold text-[#5B6EF5] border border-[#FECACA]"
-              placeholder="YYYY-MM-DD"
+              placeholder="DD-MM-YYYY"
               onSubmitEditing={(e) => {
-                const d = new Date(e.nativeEvent.text);
-                if (!isNaN(d.getTime())) setStartDate(d);
+                const d = parseDMY(e.nativeEvent.text);
+                if (d) setStartDate(d);
                 setShowStart(false);
               }}
               autoFocus
@@ -104,7 +179,7 @@ function RequestLeaveScreen() {
             onPress={() => setShowEnd(true)}
           >
             <Ionicons name="calendar-outline" size={20} color="#5B6EF5" />
-            <Text className="text-base font-semibold text-[#1C2840]">{format(endDate, 'PPP')}</Text>
+            <Text className="text-base font-semibold text-[#1C2840]">{formatDateDMY(endDate, 'dd MMMM yyyy')}</Text>
           </TouchableOpacity>
           {showEnd && DateTimePicker && (
             <DateTimePicker
@@ -116,10 +191,10 @@ function RequestLeaveScreen() {
           {showEnd && !DateTimePicker && (
             <TextInput
               className="p-3 bg-[#FEF2F2] rounded-xl mt-2 text-base font-bold text-[#5B6EF5] border border-[#FECACA]"
-              placeholder="YYYY-MM-DD"
+              placeholder="DD-MM-YYYY"
               onSubmitEditing={(e) => {
-                const d = new Date(e.nativeEvent.text);
-                if (!isNaN(d.getTime())) setEndDate(d);
+                const d = parseDMY(e.nativeEvent.text);
+                if (d) setEndDate(d);
                 setShowEnd(false);
               }}
               autoFocus

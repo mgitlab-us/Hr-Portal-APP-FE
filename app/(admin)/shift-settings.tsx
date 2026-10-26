@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
   RefreshControl, Modal, TextInput, Alert, KeyboardAvoidingView, Platform
@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useShifts } from '@/hooks/useShifts';
+import { useAuthStore } from '@/features/auth/store';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
@@ -67,6 +68,14 @@ function formatCheckin(hour: number, minute: number) {
 
 export default function ShiftSettingsScreen() {
   const { shifts, loading, refreshing, onRefresh, createShift, updateShift, deleteShift } = useShifts();
+  const { employee } = useAuthStore();
+  const isSuperAdmin = employee?.role === 'SUPER_ADMIN';
+
+  useEffect(() => {
+    if (employee && !isSuperAdmin) {
+      router.replace('/(admin)/profile');
+    }
+  }, [employee, isSuperAdmin]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingShift, setEditingShift] = useState<any>(null);
 
@@ -136,6 +145,8 @@ export default function ShiftSettingsScreen() {
       ]
     );
   };
+
+  if (employee && !isSuperAdmin) return null;
 
   return (
     <View style={s.root}>

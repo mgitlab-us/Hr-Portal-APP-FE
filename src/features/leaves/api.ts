@@ -19,6 +19,26 @@ export interface LeaveRequest {
   }
 }
 
+export interface LeaveBalanceCategory {
+  allowance: number;
+  carryForward: number;
+  total: number;
+  used: number;
+  remaining: number;
+}
+
+export interface LeaveBalances {
+  year: number;
+  cycleStart: string;
+  cycleEnd: string;
+  source?: 'DEPARTMENT' | 'COMPANY';
+  departmentName?: string | null;
+  sick: LeaveBalanceCategory;
+  casual: LeaveBalanceCategory;
+  vacation: LeaveBalanceCategory;
+  other: { used: number };
+}
+
 export const leavesApi = {
   create: async (data: any) => {
     const res = await apiClient.post<LeaveRequest>('/leaves', data);
@@ -26,6 +46,10 @@ export const leavesApi = {
   },
   getMyLeaves: async () => {
     const res = await apiClient.get<LeaveRequest[]>('/leaves/me');
+    return res.data;
+  },
+  getMyBalances: async () => {
+    const res = await apiClient.get<LeaveBalances>('/leaves/balances');
     return res.data;
   },
   getAdminPending: async () => {

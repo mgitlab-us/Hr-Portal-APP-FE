@@ -5,7 +5,8 @@ import { attendanceApi } from '@/features/attendance/api';
 import { reportsApi } from '@/features/reports/api';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
+import { formatDateDMY, formatTime12h } from '@/lib/datetime';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -102,7 +103,7 @@ export default function HistoryScreen() {
         {/* Card header */}
         <View className="flex-row justify-between items-center mb-3.5">
           <Text className="text-[13px] font-semibold text-[#1C2840]">
-            {format(parseISO(item.date), 'EEEE, MMM dd')}
+            {formatDateDMY(item.date, 'EEEE, dd MMM yyyy')}
           </Text>
           <View className={`px-2 py-0.5 rounded-md ${isComplete ? 'bg-[#E0F7F1]' : 'bg-[#FEF6E4]'}`}>
             <Text className={`text-[10px] font-semibold uppercase tracking-wide ${isComplete ? 'text-[#0D9E7A]' : 'text-[#D97706]'}`}>
@@ -116,14 +117,14 @@ export default function HistoryScreen() {
           <View className="items-center">
             <Text className="text-[9px] font-semibold text-[#B0BCCF] uppercase tracking-wide mb-1">CHECK-IN</Text>
             <Text className="text-[15px] font-semibold text-[#1C2840] -tracking-wide">
-              {format(parseISO(item.checkinTime), 'hh:mm a')}
+              {formatTime12h(item.checkinTime)}
             </Text>
           </View>
           <Ionicons name="arrow-forward" size={16} color="#E5E9F2" />
           <View className="items-center">
             <Text className="text-[9px] font-semibold text-[#B0BCCF] uppercase tracking-wide mb-1">CHECK-OUT</Text>
             <Text className="text-[15px] font-semibold text-[#1C2840] -tracking-wide">
-              {item.checkoutTime ? format(parseISO(item.checkoutTime), 'hh:mm a') : 'Missed'}
+              {item.checkoutTime ? formatTime12h(item.checkoutTime) : 'Missed'}
             </Text>
           </View>
         </View>

@@ -10,7 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { attendanceApi } from '@/features/attendance/api';
 import { useMyLeaves } from '@/features/leaves/hooks';
-import { format, parseISO } from 'date-fns';
+import { formatDateDMY, formatDateRangeDMY, formatTime12h } from '@/lib/datetime';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; text: string; icon: string }> = {
   PENDING: { label: 'Pending', color: '#D97706', bg: 'bg-amber-50', text: 'text-amber-600', icon: 'time-outline' },
@@ -48,7 +48,9 @@ export default function CombinedRequestsScreen() {
 
   const renderCorrectionItem = ({ item }: { item: any }) => {
     const cfg = STATUS_CONFIG[item.status] || STATUS_CONFIG.PENDING;
-    const date = item.attendanceRecord?.date ? format(parseISO(item.attendanceRecord.date), 'EEE, MMM dd') : '—';
+    const date = item.attendanceRecord?.date
+      ? formatDateDMY(item.attendanceRecord.date, 'EEE, dd MMM yyyy')
+      : '—';
 
     return (
       <View className="bg-white rounded-2xl mb-3 p-4 border border-slate-200 shadow-sm">
@@ -63,12 +65,12 @@ export default function CombinedRequestsScreen() {
         </View>
         <View className="flex-row items-center gap-2 mb-2">
             <Text className="text-xs text-slate-400">Current:</Text>
-            <Text className="text-sm font-medium text-slate-600">{item.originalCheckin ? format(parseISO(item.originalCheckin), 'hh:mm a') : '--'} → {item.originalCheckout ? format(parseISO(item.originalCheckout), 'hh:mm a') : '--'}</Text>
+            <Text className="text-sm font-medium text-slate-600">{item.originalCheckin ? formatTime12h(item.originalCheckin) : '--'} → {item.originalCheckout ? formatTime12h(item.originalCheckout) : '--'}</Text>
         </View>
         <View className="bg-indigo-50 p-2 rounded-lg border border-indigo-100">
             <View className="flex-row items-center gap-2">
                 <Text className="text-xs text-indigo-400 font-bold">Requested:</Text>
-                <Text className="text-sm font-bold text-indigo-700">{item.requestedCheckin ? format(parseISO(item.requestedCheckin), 'hh:mm a') : '--'} → {item.requestedCheckout ? format(parseISO(item.requestedCheckout), 'hh:mm a') : '--'}</Text>
+                <Text className="text-sm font-bold text-indigo-700">{item.requestedCheckin ? formatTime12h(item.requestedCheckin) : '--'} → {item.requestedCheckout ? formatTime12h(item.requestedCheckout) : '--'}</Text>
             </View>
         </View>
       </View>
@@ -77,7 +79,7 @@ export default function CombinedRequestsScreen() {
 
   const renderLeaveItem = ({ item }: { item: any }) => {
     const cfg = STATUS_CONFIG[item.status] || STATUS_CONFIG.PENDING;
-    const dateRange = `${format(new Date(item.startDate), 'MMM dd')} - ${format(new Date(item.endDate), 'MMM dd, yyyy')}`;
+    const dateRange = formatDateRangeDMY(item.startDate, item.endDate);
 
     return (
       <View className="bg-white rounded-2xl mb-3 p-4 border border-slate-200 shadow-sm">

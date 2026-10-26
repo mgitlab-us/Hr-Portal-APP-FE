@@ -1,6 +1,5 @@
-import { format, isValid, parseISO } from 'date-fns';
+import { DATE_TIME_DMY, formatDateDMY } from '@/lib/datetime';
 
-export function formatNoticeDate(value: string, pattern = 'MMM dd, yyyy · hh:mm a'): string {
-  const date = parseISO(value);
-  return isValid(date) ? format(date, pattern) : '';
+export function formatNoticeDate(value: string, pattern = DATE_TIME_DMY): string {
+  return formatDateDMY(value, pattern);
 }

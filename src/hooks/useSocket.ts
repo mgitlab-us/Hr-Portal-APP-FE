@@ -10,6 +10,11 @@ export const useSocket = (event?: string, callback?: (data: any) => void) => {
   const accessToken = useAuthStore((s) => s.accessToken);
   const companyId = employee?.companyId;
   const socketRef = useRef<Socket | null>(null);
+  const savedCallback = useRef(callback);
+
+  useEffect(() => {
+    savedCallback.current = callback;
+  }, [callback]);
 
   useEffect(() => {
     if (!accessToken || !companyId) return;
@@ -17,19 +22,18 @@ export const useSocket = (event?: string, callback?: (data: any) => void) => {
     socketRef.current = io(SOCKET_URL, {
       auth: { token: accessToken }, // Server verifies JWT and extracts companyId — never trust client
       transports: ['websocket'],
-      forceNew: true
     });
 
     const socket = socketRef.current;
 
-    if (event && callback) {
+    if (event) {
       socket.on(event, (data) => {
         // Company rooms are enforced server-side. Client-side filtering must
         // still drop cross-tenant payloads, but allow unkeyed trigger events
         // such as `{}` broadcasts that have no companyId by design.
         const isUnkeyed = data == null || typeof data !== 'object' || !('companyId' in data);
         if (isUnkeyed || data.companyId === companyId) {
-          callback(data);
+          savedCallback.current?.(data);
         }
       });
     }
@@ -37,7 +41,7 @@ export const useSocket = (event?: string, callback?: (data: any) => void) => {
     return () => {
       socket.disconnect();
     };
-  }, [companyId, event, callback]);
+  }, [accessToken, companyId, event]);
 
   const emit = (event: string, data: any) => {
     if (socketRef.current) {

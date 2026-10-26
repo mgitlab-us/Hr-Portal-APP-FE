@@ -7,7 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, router } from 'expo-router';
 import { correctionApi } from '@/features/corrections/api';
 import { Ionicons } from '@expo/vector-icons';
-import { format, parseISO, isValid, set } from 'date-fns';
+import { parseISO, isValid, set } from 'date-fns';
+import { formatDateDMY, formatTime12h } from '@/lib/datetime';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 function firstParam(value: string | string[] | undefined): string | undefined {
@@ -84,7 +85,7 @@ export default function RequestCorrectionScreen() {
     if (!date) return '';
     try {
       const d = parseISO(date);
-      return isValid(d) ? format(d, 'MMMM dd, yyyy') : date;
+      return isValid(d) ? formatDateDMY(d, 'dd MMMM yyyy') : date;
     } catch {
       return date;
     }
@@ -135,14 +136,14 @@ export default function RequestCorrectionScreen() {
             <View style={s.timeCol}>
               <Text style={s.fieldLabel}>CHECK-IN</Text>
               <TouchableOpacity style={s.timeInput} onPress={() => setShowPicker('in')}>
-                <Text style={s.timeValue}>{format(inTime, 'hh:mm a')}</Text>
+                <Text style={s.timeValue}>{formatTime12h(inTime)}</Text>
               </TouchableOpacity>
             </View>
             <Ionicons name="arrow-forward" size={20} color="#CBD5E1" style={s.timeArrow} />
             <View style={s.timeCol}>
               <Text style={s.fieldLabel}>CHECK-OUT</Text>
               <TouchableOpacity style={s.timeInput} onPress={() => setShowPicker('out')}>
-                <Text style={s.timeValue}>{format(outTime, 'hh:mm a')}</Text>
+                <Text style={s.timeValue}>{formatTime12h(outTime)}</Text>
               </TouchableOpacity>
             </View>
           </View>

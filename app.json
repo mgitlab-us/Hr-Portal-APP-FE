@@ -39,6 +39,7 @@
     "android": {
       "package": "com.attendance.app",
       "googleServicesFile": "./google-services.json",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#5B6EF5"

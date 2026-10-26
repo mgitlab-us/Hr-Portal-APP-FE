@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAdminPendingLeaves, useReviewLeave } from '@/features/leaves/hooks';
-import { format } from 'date-fns';
+import { formatDateRangeDMY } from '@/lib/datetime';
 import { LeaveRequest } from '@/features/leaves/api';
 
 const C = {
@@ -85,7 +85,7 @@ export default function LeaveApprovalsScreen() {
               <View style={s.dateBox}>
                 <Ionicons name="calendar-outline" size={16} color={C.accent} />
                 <Text style={s.dateText}>
-                  {format(new Date(req.startDate), 'MMM dd')} - {format(new Date(req.endDate), 'MMM dd, yyyy')}
+                  {formatDateRangeDMY(req.startDate, req.endDate)}
                 </Text>
               </View>
 

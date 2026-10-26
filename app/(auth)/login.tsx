@@ -1,15 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Animated,
+  ActivityIndicator, Animated, Pressable,
   Platform, StatusBar, ScrollView,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeKeyboardAvoidingView } from '../../src/components/ui/SafeKeyboardAvoidingView';
 import { useForm, Controller } from 'react-hook-form';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { LoginInput } from '@/types';
+import { formatDateDMY } from '@/lib/datetime';
 import { authApi } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/store';
 import { secureStorage } from '@/lib/secureStorage';
@@ -17,17 +18,37 @@ import { syncPushTokenToServer } from '@/lib/notificationService';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+// ── Design tokens (blue theme — matches web) ─────────────────────────────────
 const C = {
-  navy: '#0F1D3A',
-  navyMid: '#162447',
-  navyLight: '#1E3A6E',
-  accent: '#4A90D9',
-  accentBright: '#5BA3F5',
-  teal: '#1DB8A0',
+  // header
+  navy: '#0B1736',
+  navyMid: '#0F2152',
+  navyLight: '#16348A',
+  // brand blues
+  blue: '#2F66E8',
+  blueBright: '#4C8DF7',
+  link: '#2563EB',
+  cyan: '#4FB4F2',
+  // text
+  ink: '#0B1B45',
+  muted: '#6E84AE',
+  placeholder: '#7C90B7',
+  // surfaces
   white: '#FFFFFF',
-  offWhite: '#F7F9FC',
-  errorRed: '#FF6B6B',
+  cardTop: '#F7F9FE',
+  cardMid: '#F3F6FD',
+  cardBottom: '#E9F0FC',
+  border: '#E2E9F6',
+  line: '#D5DEEF',
+  tile: '#EAF1FD',
+  tileActive: '#DCE9FD',
+  iconIdle: '#7F97C6',
+  avatarBg: '#CFE5FC',
+  errorRed: '#E5484D',
 };
+
+const BUTTON_GRADIENT: [string, string] = ['#4A8CF7', '#3A5FD9'];
+const HEAVY_FONT = Platform.OS === 'android' ? 'sans-serif-black' : undefined;
 
 // ── Live clock ────────────────────────────────────────────────────────────────
 function LiveClock() {
@@ -38,11 +59,11 @@ function LiveClock() {
     return () => clearInterval(tick);
   }, []);
 
-  const hh = String(time.getHours()).padStart(2, '0');
+  const hh = String(time.getHours() % 12 || 12).padStart(2, '0');
   const mm = String(time.getMinutes()).padStart(2, '0');
   const ss = String(time.getSeconds()).padStart(2, '0');
   const ampm = time.getHours() >= 12 ? 'PM' : 'AM';
-  const dateStr = time.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const dateStr = formatDateDMY(time, 'EEEE, dd MMMM yyyy');
 
   return (
     <View style={s.clockWrap}>
@@ -77,8 +98,15 @@ function FloatInput({
 }: InputProps) {
   const [focused, setFocused] = useState(false);
   const [visible, setVisible] = useState(false);
+  const inputRef = useRef<TextInput>(null);
   const labelAnim = useRef(new Animated.Value(value ? 1 : 0)).current;
   const borderAnim = useRef(new Animated.Value(0)).current;
+
+  // Keep the label in sync when the value is set from outside (autofill, reset)
+  useEffect(() => {
+    if (value) labelAnim.setValue(1);
+    else if (!focused) labelAnim.setValue(0);
+  }, [value]);
 
   const handleFocus = () => {
     setFocused(true);
@@ -95,59 +123,59 @@ function FloatInput({
     Animated.timing(borderAnim, { toValue: 0, duration: 200, useNativeDriver: false }).start();
   };
 
-  const labelTop = labelAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 8] });
+  const labelTop = labelAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 9] });
   const labelSize = labelAnim.interpolate({ inputRange: [0, 1], outputRange: [15, 11] });
-  const labelColor = labelAnim.interpolate({ inputRange: [0, 1], outputRange: ['#A0AEC0', C.accentBright] });
+  const labelColor = labelAnim.interpolate({ inputRange: [0, 1], outputRange: [C.placeholder, C.blueBright] });
   const borderColor = error
     ? C.errorRed
-    : borderAnim.interpolate({ inputRange: [0, 1], outputRange: ['#EEF2F8', C.accentBright] });
+    : borderAnim.interpolate({ inputRange: [0, 1], outputRange: [C.border, C.blueBright] });
 
   return (
     <View style={s.inputWrap}>
-      {/*
-        FIX 5: Separate shadow wrapper from overflow:hidden container.
-        Android clips elevation shadows when overflow='hidden' is on the same view.
-        Shadow lives on inputShadow, clipping lives on inputBox.
-      */}
-      <View style={s.inputShadow}>
-        <Animated.View style={[s.inputBox, { borderColor }, focused && s.inputBoxFocused]}>
-          <View style={[s.inputIconStrip, focused && s.inputIconStripActive]}>
-            <Ionicons name={icon as any} size={17} color={focused ? C.accentBright : '#A0AEC0'} />
-          </View>
-          <View style={s.inputInner}>
-            <Animated.Text style={[s.floatLabel, { top: labelTop, fontSize: labelSize, color: labelColor }]}>
-              {label}
-            </Animated.Text>
-            <TextInput
-              style={s.inputText}
-              value={value}
-              onChangeText={onChangeText}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-              secureTextEntry={secureTextEntry && !visible}
-              keyboardType={keyboardType}
-              autoCapitalize={autoCapitalize ?? 'none'}
-              placeholderTextColor="transparent"
-              // FIX 3: Explicit font family so Android renders bold weights correctly
-              // If you load a custom font (e.g. Inter), replace 'System' with that name
-              underlineColorAndroid="transparent"
-            />
-          </View>
-          {secureTextEntry && (
-            <TouchableOpacity onPress={() => setVisible(v => !v)} style={s.eyeBtn}>
-              <Ionicons name={visible ? 'eye-off-outline' : 'eye-outline'} size={17} color={focused ? C.accentBright : '#A0AEC0'} />
-            </TouchableOpacity>
-          )}
-          {!!value && !secureTextEntry && !error && (
-            <View style={s.checkBadge}>
-              <Ionicons name="checkmark" size={10} color={C.white} />
+      <Pressable onPress={() => inputRef.current?.focus()}>
+        {/* Shadow wrapper is separate from the clipped box so Android doesn't cut the elevation */}
+        <View style={s.inputShadow}>
+          <Animated.View style={[s.inputBox, { borderColor }]}>
+            <View style={[s.iconTile, focused && s.iconTileActive]}>
+              <Ionicons name={icon as any} size={20} color={focused ? C.link : C.iconIdle} />
             </View>
-          )}
-        </Animated.View>
-      </View>
+            <View style={s.inputInner}>
+              <TextInput
+                ref={inputRef}
+                style={s.inputText}
+                value={value}
+                onChangeText={onChangeText}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
+                secureTextEntry={secureTextEntry && !visible}
+                keyboardType={keyboardType}
+                autoCapitalize={autoCapitalize ?? 'none'}
+                placeholderTextColor="transparent"
+                underlineColorAndroid="transparent"
+                selectionColor={C.blueBright}
+              />
+              <Animated.Text
+                pointerEvents="none"
+                style={[s.floatLabel, { top: labelTop, fontSize: labelSize, color: labelColor }]}
+              >
+                {label}
+              </Animated.Text>
+            </View>
+            {secureTextEntry && (
+              <TouchableOpacity onPress={() => setVisible(v => !v)} style={s.eyeBtn} hitSlop={8}>
+                <Ionicons
+                  name={visible ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={focused ? C.link : C.placeholder}
+                />
+              </TouchableOpacity>
+            )}
+          </Animated.View>
+        </View>
+      </Pressable>
       {error && (
         <View style={s.errorRow}>
-          <Ionicons name="alert-circle-outline" size={12} color={C.errorRed} />
+          <Ionicons name="alert-circle-outline" size={13} color={C.errorRed} />
           <Text style={s.errorText}>{error}</Text>
         </View>
       )}
@@ -188,72 +216,74 @@ export default function LoginScreen() {
         router.replace(res.employee.role === 'EMPLOYEE' ? '/(employee)/' : '/(admin)/');
       }
     } catch (e: any) {
-      setApiError(!e.response
-        ? 'Unable to connect to server. Check your internet connection.'
-        : e.response?.data?.message || 'Incorrect email or password'
-      );
+      console.log('[Login Error]', {
+        status: e.response?.status,
+        data: e.response?.data,
+        message: e.message,
+        url: e.config?.url,
+        baseURL: e.config?.baseURL,
+      });
+      const serverMsg = typeof e.response?.data?.message === 'string'
+        ? e.response.data.message
+        : null;
+      if (serverMsg) {
+        setApiError(serverMsg);
+      } else if (e.response?.status === 503) {
+        setApiError('Server unavailable (503). Still trying to reach Render instead of local server.');
+      } else if (e.response?.status >= 500) {
+        setApiError(`Server error (${e.response.status}). Check server.`);
+      } else if (!e.response) {
+        setApiError('Unable to connect to server. Check your connection or API URL.');
+      } else {
+        setApiError('Incorrect email or password');
+      }
     }
   };
 
   return (
-    // FIX 2: KeyboardAvoidingView wraps everything.
-    // behavior='padding' on iOS, undefined on Android (ScrollView handles it natively).
     <SafeKeyboardAvoidingView
       style={s.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
     >
-      {/*
-        FIX 1: translucent + backgroundColor='transparent' on Android
-        makes the gradient extend behind the status bar edge-to-edge.
-      */}
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
+      {/* translucent + transparent lets the gradient run behind the Android status bar */}
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {/* ── Gradient header ── */}
       <LinearGradient
         colors={[C.navy, C.navyMid, C.navyLight]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        // FIX 1 cont: paddingTop accounts for translucent status bar on Android
-        style={[s.header, { paddingTop: insets.top + 16 }]}
+        style={[s.header, { paddingTop: insets.top + 24 }]}
       >
-        <View style={s.orb1} />
-        <View style={s.orb2} />
-        <View style={s.orb3} />
+        <View style={s.orbCircle} />
+        <View style={s.orbSweep} />
 
         <Animated.View style={{ opacity: fadeIn, transform: [{ translateY: slideUp }] }}>
           <View style={s.brandRow}>
-            {/*
-              FIX 6: LinearGradient border radius on Android.
-              Wrap in a View with borderRadius + overflow:'hidden' instead of
-              putting borderRadius directly on LinearGradient.
-            */}
             <View style={s.logoBoxWrap}>
               <LinearGradient
-                colors={[C.accentBright, C.teal]}
+                colors={[C.blueBright, C.blue]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={s.logoBox}
               >
-                <Ionicons name="time-outline" size={16} color={C.white} />
+                <Ionicons name="business-outline" size={20} color={C.white} />
               </LinearGradient>
             </View>
             <Text style={s.brandName}>TapIn</Text>
           </View>
+
           <LiveClock />
-          <View style={s.statRow}>
-            <View style={s.statPill}>
-              <Ionicons name="people-outline" size={12} color={C.accentBright} />
-              <Text style={s.statText}>HR Portal</Text>
+
+          <View style={s.pillRow}>
+            <View style={s.pill}>
+              <Ionicons name="people-outline" size={15} color={C.blueBright} />
+              <Text style={s.pillText}>HR Portal</Text>
             </View>
-            <View style={s.statDivider} />
-            <View style={s.statPill}>
-              <Ionicons name="shield-checkmark-outline" size={12} color={C.teal} />
-              <Text style={s.statText}>Secure Login</Text>
+            <View style={s.pill}>
+              <Ionicons name="shield-checkmark-outline" size={15} color={C.cyan} />
+              <Text style={s.pillText}>Secure Login</Text>
             </View>
           </View>
         </Animated.View>
@@ -262,15 +292,49 @@ export default function LoginScreen() {
       {/* ── Scrollable card body ── */}
       <ScrollView
         style={s.cardOuter}
-        contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+        contentContainerStyle={s.scrollContent}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
         bounces={false}
-        // FIX 2 cont: iOS 15+ native keyboard inset adjustment
         automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
       >
-        <Animated.View style={[s.card, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
+        <Animated.View
+          style={[
+            s.card,
+            { paddingBottom: insets.bottom + 40, opacity: fadeIn, transform: [{ translateY: slideUp }] },
+          ]}
+        >
+          <LinearGradient
+            colors={[C.cardTop, C.cardMid, C.cardBottom]}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+          {/* Smooth, clipped vector waves anchored to the bottom of the card. */}
+          <View style={s.waves} pointerEvents="none">
+            <Svg
+              width="100%"
+              height="100%"
+              viewBox="0 0 400 180"
+              preserveAspectRatio="none"
+            >
+              <Path
+                d="M0 58 C58 48 118 30 184 30 C244 30 264 78 310 80 C346 81 375 49 400 42 L400 180 L0 180 Z"
+                fill="#DCE9FC"
+                opacity={0.88}
+              />
+              <Path
+                d="M0 92 C70 104 132 124 205 143 C278 162 338 126 400 105 L400 180 L0 180 Z"
+                fill="#C9DDFB"
+                opacity={0.48}
+              />
+              <Path
+                d="M0 132 C72 112 126 121 190 145 C262 172 329 167 400 143 L400 180 L0 180 Z"
+                fill="#EAF2FF"
+                opacity={0.72}
+              />
+            </Svg>
+          </View>
 
           <View style={s.handle} />
 
@@ -279,83 +343,76 @@ export default function LoginScreen() {
               <Text style={s.cardTitle}>Welcome back</Text>
               <Text style={s.cardSubtitle}>Sign in to continue to your workspace</Text>
             </View>
-            {/*
-              FIX 6 cont: cardAvatarRing wraps LinearGradient with
-              overflow:'hidden' + borderRadius so Android clips it correctly.
-            */}
-            <View style={s.cardAvatarRing}>
-              <View style={s.cardAvatarClip}>
-                <LinearGradient colors={[C.accentBright, C.teal]} style={s.cardAvatar}>
-                  <Ionicons name="person-outline" size={18} color={C.white} />
-                </LinearGradient>
+            <View style={s.avatarWrap}>
+              <View style={s.avatarCircle}>
+                <Ionicons name="person-outline" size={22} color={C.link} />
               </View>
+              <View style={s.avatarDot} />
             </View>
           </View>
 
           {apiError && (
             <View style={s.apiErrorBox}>
-              <Ionicons name="warning-outline" size={13} color={C.errorRed} />
+              <Ionicons name="warning-outline" size={14} color={C.errorRed} />
               <Text style={s.apiErrorText}>{apiError}</Text>
             </View>
           )}
 
-          {/*
-            FIX 4+5: inputsCard has elevation for Android shadow.
-            No overflow:'hidden' on this view so shadow isn't clipped.
-          */}
-          <View style={s.inputsCard}>
-            <Controller
-              control={control}
-              name="email"
-              rules={{ required: 'Email is required' }}
-              render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
-                <FloatInput
-                  label="Email address" icon="mail-outline"
-                  value={value ?? ''} onChangeText={onChange} onBlur={onBlur}
-                  keyboardType="email-address" error={error?.message}
-                />
-              )}
-            />
-            <View style={s.inputSeparator}>
-              <View style={s.inputSepLine} />
-              <Ionicons name="lock-closed-outline" size={11} color="#C5CDD8" style={{ marginHorizontal: 8 }} />
-              <View style={s.inputSepLine} />
-            </View>
-            <Controller
-              control={control}
-              name="password"
-              rules={{ required: 'Password is required' }}
-              render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
-                <FloatInput
-                  label="Password" icon="lock-closed-outline"
-                  value={value ?? ''} onChangeText={onChange} onBlur={onBlur}
-                  secureTextEntry error={error?.message}
-                />
-              )}
-            />
+          <Controller
+            control={control}
+            name="email"
+            rules={{ required: 'Email is required' }}
+            render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
+              <FloatInput
+                label="Email address" icon="mail-outline"
+                value={value ?? ''} onChangeText={onChange} onBlur={onBlur}
+                keyboardType="email-address" error={error?.message}
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="password"
+            rules={{ required: 'Password is required' }}
+            render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
+              <FloatInput
+                label="Password" icon="lock-closed-outline"
+                value={value ?? ''} onChangeText={onChange} onBlur={onBlur}
+                secureTextEntry error={error?.message}
+              />
+            )}
+          />
+
+          <View style={{ alignItems: 'flex-end', marginTop: 6, marginBottom: 14 }}>
+            <TouchableOpacity
+              onPress={() => router.push('/(auth)/forgot-password')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={{ color: C.link, fontSize: 13, fontWeight: '600' }}>
+                Forgot password?
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          {/* FIX 6 cont: loginBtn uses a wrapper View for borderRadius+overflow
-              so the LinearGradient clips correctly on Android */}
           <TouchableOpacity
-            style={[s.loginBtn, isSubmitting && s.loginBtnDisabled]}
+            style={[s.btn, isSubmitting && s.btnDisabled]}
             onPress={handleSubmit(onSubmit)}
             disabled={isSubmitting}
             activeOpacity={0.85}
           >
-            <View style={s.loginBtnClip}>
+            <View style={s.btnClip}>
               <LinearGradient
-                colors={[C.accentBright, C.teal]}
+                colors={BUTTON_GRADIENT}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={s.loginBtnGradient}
+                style={s.btnGradient}
               >
                 {isSubmitting ? (
                   <ActivityIndicator color={C.white} />
                 ) : (
-                  <View style={s.loginBtnInner}>
-                    <Text style={s.loginBtnText}>Sign In</Text>
-                    <View style={s.loginBtnArrow}>
-                      <Ionicons name="arrow-forward" size={15} color={C.accentBright} />
+                  <View style={s.btnInner}>
+                    <Text style={s.btnText}>Sign In</Text>
+                    <View style={s.btnArrow}>
+                      <Ionicons name="arrow-forward" size={16} color={C.blue} />
                     </View>
                   </View>
                 )}
@@ -364,7 +421,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           <View style={s.footerRow}>
-            <Ionicons name="information-circle-outline" size={12} color="#B0BAC8" />
+            <Ionicons name="information-circle-outline" size={14} color={C.muted} />
             <Text style={s.footerNote}>Contact your HR admin if you need account access.</Text>
           </View>
 
@@ -380,7 +437,6 @@ export default function LoginScreen() {
               <Text style={s.registerLink}>Create one now →</Text>
             </TouchableOpacity>
           </View>
-
         </Animated.View>
       </ScrollView>
     </SafeKeyboardAvoidingView>
@@ -388,113 +444,138 @@ export default function LoginScreen() {
 }
 
 // ── Styles ───────────────────────────────────────────────────────────────────
-const CARD_R = 28;
+const CARD_R = 32;
 
 const s = StyleSheet.create({
-  // FIX 1: root has no backgroundColor so translucent status bar shows gradient
-  root: { flex: 1, backgroundColor: C.offWhite },
+  root: { flex: 1, backgroundColor: C.cardMid },
 
-  header: {
-    paddingHorizontal: 24,
-    paddingBottom: 44,
-    overflow: 'hidden',
+  // Header
+  header: { paddingHorizontal: 24, paddingBottom: 48, overflow: 'hidden' },
+  orbCircle: {
+    position: 'absolute', width: 280, height: 280, borderRadius: 140,
+    backgroundColor: 'rgba(76,141,247,0.10)', top: -120, right: -90,
   },
-  orb1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(91,163,245,0.08)', top: -60, right: -50 },
-  orb2: { position: 'absolute', width: 130, height: 130, borderRadius: 65, backgroundColor: 'rgba(29,184,160,0.07)', bottom: -20, left: -30 },
-  orb3: { position: 'absolute', width: 70, height: 70, borderRadius: 35, backgroundColor: 'rgba(255,255,255,0.04)', top: 40, right: 70 },
+  orbSweep: {
+    position: 'absolute', width: 620, height: 260, borderRadius: 130,
+    backgroundColor: 'rgba(60,110,230,0.14)', top: 70, right: -300,
+    transform: [{ rotate: '-28deg' }],
+  },
 
   brandRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  // FIX 6: wrapper clips the gradient with borderRadius
-  logoBoxWrap: { width: 30, height: 30, borderRadius: 9, overflow: 'hidden', marginRight: 9 },
-  logoBox: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  brandName: { fontSize: 15, fontWeight: '700', color: C.white, letterSpacing: 0.5 },
+  logoBoxWrap: { width: 36, height: 36, borderRadius: 11, overflow: 'hidden', marginRight: 12 },
+  logoBox: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  brandName: { fontSize: 18, fontWeight: '600', color: C.white, letterSpacing: 0.2 },
 
-  clockWrap: { marginBottom: 12 },
-  clockRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  // FIX 3: explicit fontFamily for Android bold rendering
-  clockHM: { fontSize: 42, fontWeight: '800', color: C.white, letterSpacing: -1, lineHeight: 46, fontFamily: Platform.OS === 'android' ? 'sans-serif-black' : undefined },
-  clockRight: { marginLeft: 7, marginBottom: 4 },
-  clockSS: { fontSize: 16, fontWeight: '600', color: 'rgba(255,255,255,0.5)', lineHeight: 20 },
-  clockAMPM: { fontSize: 12, fontWeight: '700', color: C.accentBright, lineHeight: 16 },
-  clockDate: { fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2, letterSpacing: 0.2 },
+  clockWrap: { marginBottom: 14 },
+  clockRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  clockHM: {
+    fontSize: 44, fontWeight: '800', color: C.white, letterSpacing: -1, lineHeight: 50,
+    fontFamily: HEAVY_FONT,
+  },
+  clockRight: { marginLeft: 8, marginTop: 6 },
+  clockSS: { fontSize: 19, fontWeight: '700', color: 'rgba(150,175,230,0.8)', lineHeight: 22 },
+  clockAMPM: { fontSize: 14, fontWeight: '800', color: C.blueBright, lineHeight: 17 },
+  clockDate: { fontSize: 14, color: 'rgba(160,182,230,0.75)', marginTop: 6, letterSpacing: 0.1 },
 
-  statRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 12, paddingVertical: 7, paddingHorizontal: 12, alignSelf: 'flex-start', marginTop: 2 },
-  statPill: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  statText: { fontSize: 11, color: 'rgba(255,255,255,0.65)', fontWeight: '500' },
-  statDivider: { width: 1, height: 12, backgroundColor: 'rgba(255,255,255,0.15)', marginHorizontal: 10 },
+  pillRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    height: 28, paddingHorizontal: 11, borderRadius: 10,
+    backgroundColor: 'rgba(90,140,240,0.16)',
+  },
+  pillText: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.88)' },
 
+  // Card
   cardOuter: { flex: 1, marginTop: -CARD_R },
   scrollContent: { flexGrow: 1 },
   card: {
-    backgroundColor: C.offWhite,
+    backgroundColor: C.cardMid,
     borderTopLeftRadius: CARD_R,
     borderTopRightRadius: CARD_R,
-    paddingHorizontal: 22,
-    paddingBottom: 8,
+    paddingHorizontal: 24,
     minHeight: '100%',
+    overflow: 'hidden',
   },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#DDE3EE', alignSelf: 'center', marginTop: 12, marginBottom: 20 },
-
-  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 },
-  cardTitle: { fontSize: 22, fontWeight: '800', color: C.navy, letterSpacing: -0.4, fontFamily: Platform.OS === 'android' ? 'sans-serif-black' : undefined },
-  cardSubtitle: { fontSize: 12, color: '#8A9BB5', marginTop: 3, lineHeight: 17 },
-  // FIX 6: ring is the border, clip is overflow:hidden for gradient
-  cardAvatarRing: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, borderColor: 'rgba(91,163,245,0.25)', padding: 2 },
-  cardAvatarClip: { flex: 1, borderRadius: 20, overflow: 'hidden' },
-  cardAvatar: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-
-  apiErrorBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF0F0', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 14, gap: 7, borderLeftWidth: 3, borderLeftColor: C.errorRed },
-  apiErrorText: { fontSize: 12, color: C.errorRed, flex: 1 },
-
-  // FIX 4+5: elevation present, no overflow:'hidden' so shadow isn't clipped
-  inputsCard: {
-    backgroundColor: C.white,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    marginBottom: 14,
-    shadowColor: C.navy,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,           // Android shadow
-    borderWidth: 1,
-    borderColor: '#EEF2F8',
+  // SVG keeps the wave curves smooth at every screen width.
+  waves: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 170,
+    overflow: 'hidden',
   },
-  inputSeparator: { flexDirection: 'row', alignItems: 'center', marginVertical: 1 },
-  inputSepLine: { flex: 1, height: 1, backgroundColor: '#F0F3F8' },
+  handle: {
+    width: 43, height: 4, borderRadius: 2, backgroundColor: '#C8D2E6',
+    alignSelf: 'center', marginTop: 14, marginBottom: 22,
+  },
 
-  inputWrap: { marginVertical: 5 },
-  // FIX 5: shadow on outer wrapper, no overflow:'hidden' here
-  inputShadow: { borderRadius: 10 },
-  // overflow:'hidden' only on the inner box that needs clipping
-  inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.white, borderWidth: 0, borderRadius: 10, minHeight: 58, overflow: 'hidden' },
-  inputBoxFocused: { backgroundColor: '#F8FBFF' },
-  inputIconStrip: { width: 42, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F9FD', borderRightWidth: 1, borderRightColor: '#EEF2F8', marginRight: 10 },
-  inputIconStripActive: { backgroundColor: '#EEF6FF', borderRightColor: 'rgba(91,163,245,0.25)' },
-  inputInner: { flex: 1, paddingTop: 16, paddingRight: 4 },
+  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 26 },
+  cardTitle: { fontSize: 28, fontWeight: '800', color: C.ink, letterSpacing: -0.6, lineHeight: 34, fontFamily: HEAVY_FONT },
+  cardSubtitle: { fontSize: 14, color: C.muted, marginTop: 4, lineHeight: 20 },
+
+  avatarWrap: { width: 46, height: 46, marginLeft: 12 },
+  avatarCircle: {
+    width: 46, height: 46, borderRadius: 23, backgroundColor: C.avatarBg,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarDot: { position: 'absolute', top: 3, right: 3, width: 9, height: 9, borderRadius: 5, backgroundColor: '#4C9BF8' },
+
+  apiErrorBox: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF0F0', borderRadius: 12,
+    paddingVertical: 10, paddingHorizontal: 12, marginBottom: 14, gap: 8,
+    borderLeftWidth: 3, borderLeftColor: C.errorRed,
+  },
+  apiErrorText: { fontSize: 12.5, color: C.errorRed, flex: 1 },
+
+  // Inputs — one card per field
+  inputWrap: { marginBottom: 13 },
+  inputShadow: {
+    borderRadius: 18, backgroundColor: C.white,
+    shadowColor: '#1E3A8A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12,
+    elevation: 2,
+  },
+  inputBox: {
+    flexDirection: 'row', alignItems: 'center', height: 62,
+    backgroundColor: C.white, borderWidth: 1, borderRadius: 18, overflow: 'hidden',
+    paddingLeft: 11, paddingRight: 6,
+  },
+  iconTile: {
+    width: 40, height: 40, borderRadius: 11, backgroundColor: C.tile,
+    alignItems: 'center', justifyContent: 'center', marginRight: 14,
+  },
+  iconTileActive: { backgroundColor: C.tileActive },
+  inputInner: { flex: 1, height: 60 },
   floatLabel: { position: 'absolute', left: 0 },
-  inputText: { fontSize: 14, color: C.navy, paddingVertical: 2, fontWeight: '500' },
-  eyeBtn: { padding: 11, alignSelf: 'stretch', justifyContent: 'center' },
-  checkBadge: { width: 16, height: 16, borderRadius: 8, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, marginLeft: 2 },
-  errorText: { fontSize: 11, color: C.errorRed },
+  inputText: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    paddingTop: 18, paddingBottom: 0, paddingHorizontal: 0,
+    fontSize: 15, fontWeight: '500', color: C.ink,
+    includeFontPadding: false,
+  },
+  eyeBtn: { width: 40, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, marginLeft: 4 },
+  errorText: { fontSize: 12, color: C.errorRed },
 
-  // FIX 6: loginBtn — no overflow:'hidden', clipping lives in loginBtnClip
-  loginBtn: { borderRadius: 14, marginBottom: 4 },
-  loginBtnDisabled: { opacity: 0.6 },
-  loginBtnClip: { borderRadius: 14, overflow: 'hidden' },
-  loginBtnGradient: { paddingVertical: 14, paddingHorizontal: 22 },
-  loginBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  loginBtnText: { fontSize: 15, fontWeight: '700', color: C.white, letterSpacing: 0.3 },
-  loginBtnArrow: { width: 26, height: 26, borderRadius: 13, backgroundColor: C.white, alignItems: 'center', justifyContent: 'center', marginLeft: 9 },
+  // Button
+  btn: { borderRadius: 18, marginTop: 9 },
+  btnDisabled: { opacity: 0.6 },
+  btnClip: { borderRadius: 18, overflow: 'hidden' },
+  btnGradient: { height: 54, paddingHorizontal: 22, alignItems: 'center', justifyContent: 'center' },
+  btnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  btnText: { fontSize: 17, fontWeight: '700', color: C.white, letterSpacing: 0.2 },
+  btnArrow: {
+    width: 26, height: 26, borderRadius: 13, backgroundColor: C.white,
+    alignItems: 'center', justifyContent: 'center', marginLeft: 10,
+  },
 
-  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 16 },
-  footerNote: { fontSize: 11, color: '#A0AEC0', textAlign: 'center', lineHeight: 16 },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 14, gap: 8 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#E8EDF5' },
-  dividerText: { fontSize: 11, color: '#B0BAC8', fontWeight: '500' },
-  registerRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  registerText: { fontSize: 12, color: '#8A9BB5' },
-  registerLink: { fontSize: 12, fontWeight: '700', color: C.teal },
+  // Footer
+  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 20 },
+  footerNote: { fontSize: 12.5, color: C.muted, textAlign: 'center' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginTop: 22, gap: 16 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: C.line },
+  dividerText: { fontSize: 14, color: C.placeholder, fontWeight: '500' },
+  registerRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 20 },
+  registerText: { fontSize: 14, color: C.muted },
+  registerLink: { fontSize: 14, fontWeight: '700', color: C.link },
 });
