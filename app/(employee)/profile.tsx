@@ -96,6 +96,21 @@ export default function ProfileScreen() {
               <ProfileRow icon="finger-print-outline" label="Employee ID" value={employee?.employeeCode || 'EMP-001'} color="#0D9E7A" />
               <View className="h-px bg-[#F3F4F8] my-1" />
               <ProfileRow icon="briefcase-outline" label="Designation" value={employee?.designation || 'Software Engineer'} color="#7C5CBF" />
+              <View className="h-px bg-[#F3F4F8] my-1" />
+              <TouchableOpacity
+                className="flex-row items-center py-3"
+                onPress={() => router.push('/(employee)/payslips')}
+                activeOpacity={0.7}
+              >
+                <View className="w-10 h-10 rounded-xl justify-center items-center mr-4" style={{ backgroundColor: '#2563EB10' }}>
+                  <Ionicons name="wallet-outline" size={20} color="#2563EB" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-[11px] font-semibold text-[#96A0B5] mb-0.5">Compensation</Text>
+                  <Text className="text-[15px] font-bold text-[#0B0F17]">My Payslips</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#96A0B5" />
+              </TouchableOpacity>
             </View>
           </View>
 

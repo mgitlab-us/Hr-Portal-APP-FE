@@ -49,6 +49,7 @@ export default function EmployeeLayout() {
       {/* Hidden — accessed via tapping a card in History or Leaves */}
       <Tabs.Screen name="request-correction" options={{ href: null }} />
       <Tabs.Screen name="request-leave" options={{ href: null }} />
+      <Tabs.Screen name="payslips" options={{ href: null }} />
     </Tabs>
   );
 }
