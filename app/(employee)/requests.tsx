@@ -9,8 +9,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { attendanceApi } from '@/features/attendance/api';
-import { useMyLeaves } from '@/features/leaves/hooks';
+import { correctionApi } from '@/features/corrections/api';
+import { leavesApi } from '@/features/leaves/api';
+import { useManagerPendingLeaves, useMyLeaves } from '@/features/leaves/hooks';
 import { formatDateDMY, formatDateRangeDMY, formatTime12h } from '@/lib/datetime';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; text: string; icon: string }> = {
   PENDING: { label: 'Pending', color: '#D97706', bg: 'bg-amber-50', text: 'text-amber-600', icon: 'time-outline' },
@@ -24,8 +28,36 @@ export default function CombinedRequestsScreen() {
   const [corrections, setCorrections] = useState<any[]>([]);
   const [loadingCorrections, setLoadingCorrections] = useState(true);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [managerCorrectionCount, setManagerCorrectionCount] = useState(0);
 
   const { data: leaves, isLoading: loadingLeaves, refetch: refetchLeaves } = useMyLeaves();
+  const { data: managerLeaves } = useManagerPendingLeaves();
+  const managerPendingCount = (managerLeaves?.length ?? 0) + managerCorrectionCount;
+
+  useEffect(() => {
+    correctionApi
+      .getManagerPending()
+      .then((data) => setManagerCorrectionCount(Array.isArray(data) ? data.length : 0))
+      .catch(() => setManagerCorrectionCount(0));
+  }, []);
+
+  const openAttachment = async (requestId: string, fileName: string, mimeType: string) => {
+    try {
+      const file = await leavesApi.getAttachment(requestId);
+      const directory = FileSystem.cacheDirectory || FileSystem.documentDirectory;
+      if (!directory) throw new Error('No cache directory');
+      const path = `${directory}${file.fileName || fileName}`;
+      await FileSystem.writeAsStringAsync(path, file.data, { encoding: 'base64' });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(path, {
+          mimeType: file.mimeType || mimeType,
+          dialogTitle: 'Medical note',
+        });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const loadCorrections = useCallback(async () => {
     try {
@@ -92,8 +124,27 @@ export default function CombinedRequestsScreen() {
             <Text className={`text-[10px] font-bold uppercase ${cfg.text}`}>{cfg.label}</Text>
           </View>
         </View>
-        <Text className="text-xs text-slate-400 mb-1">{dateRange}</Text>
+        <View className="mb-1 flex-row flex-wrap items-center gap-2">
+          <Text className="text-xs text-slate-400">{dateRange}</Text>
+          {item.duration && item.duration !== 'FULL_DAY' && (
+            <View className="rounded bg-indigo-50 px-1.5 py-0.5">
+              <Text className="text-[9px] font-bold uppercase text-indigo-600">
+                {item.duration === 'FIRST_HALF' ? 'Morning · 0.5 day' : 'Afternoon · 0.5 day'}
+              </Text>
+            </View>
+          )}
+        </View>
         <Text className="text-sm text-slate-600" numberOfLines={2}>{item.reason}</Text>
+        {item.attachment && (
+          <TouchableOpacity
+            className="mt-3 flex-row items-center gap-2 self-start rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5"
+            onPress={() => openAttachment(item.id, item.attachment.fileName, item.attachment.mimeType)}
+          >
+            <Ionicons name="attach" size={13} color="#5B6EF5" />
+            <Text className="text-[10px] font-bold text-slate-600">Medical note</Text>
+            <Ionicons name="share-outline" size={12} color="#94A3B8" />
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -137,6 +188,43 @@ export default function CombinedRequestsScreen() {
         >
             <Ionicons name="airplane-outline" size={16} color={tab === 'LEAVE' ? '#1e293b' : '#94a3b8'} />
             <Text className={`ml-2 text-xs font-bold ${tab === 'LEAVE' ? 'text-slate-800' : 'text-slate-400'}`}>Leaves</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Team tools */}
+      <View className="mt-3 flex-row gap-2 px-5">
+        <TouchableOpacity
+          onPress={() => router.push('/(employee)/approvals')}
+          className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5"
+        >
+          <View className="h-7 w-7 items-center justify-center rounded-lg bg-amber-50">
+            <Ionicons name="checkmark-done-outline" size={15} color="#D97706" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-[11px] font-bold text-slate-700">My approvals</Text>
+            <Text className="text-[9px] text-slate-400">
+              {managerPendingCount > 0 ? `${managerPendingCount} waiting` : 'Team requests'}
+            </Text>
+          </View>
+          {managerPendingCount > 0 && (
+            <View className="h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5">
+              <Text className="text-[9px] font-bold text-white">{managerPendingCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => router.push('/(employee)/team-calendar')}
+          className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5"
+        >
+          <View className="h-7 w-7 items-center justify-center rounded-lg bg-blue-50">
+            <Ionicons name="people-outline" size={15} color="#2563EB" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-[11px] font-bold text-slate-700">Team calendar</Text>
+            <Text className="text-[9px] text-slate-400">Who is away</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={13} color="#CBD5E1" />
         </TouchableOpacity>
       </View>
 

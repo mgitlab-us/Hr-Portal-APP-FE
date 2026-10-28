@@ -15,10 +15,13 @@ const C = {
   subtle: '#8A9BB5',
   bg: '#F8FAFC',
   danger: '#FF6B6B',
+  border: '#E2E8F0',
 };
 
 export default function AdminCorrectionsScreen() {
-  const [requests, setRequests] = useState<any[]>([]);
+  const [managerRequests, setManagerRequests] = useState<any[]>([]);
+  const [hrRequests, setHrRequests] = useState<any[]>([]);
+  const [queue, setQueue] = useState<'MANAGER' | 'HR'>('MANAGER');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [reviewing, setReviewing] = useState(false);
@@ -27,8 +30,12 @@ export default function AdminCorrectionsScreen() {
   const loadData = useCallback(async () => {
     setError(null);
     try {
-      const data = await correctionApi.getPending();
-      setRequests(data);
+      const [managerData, hrData] = await Promise.all([
+        correctionApi.getManagerPending().catch(() => []),
+        correctionApi.getPending().catch(() => []),
+      ]);
+      setManagerRequests(Array.isArray(managerData) ? managerData : []);
+      setHrRequests(Array.isArray(hrData) ? hrData : []);
     } catch (e) {
       console.error(e);
       setError('Could not load correction requests.');
@@ -40,10 +47,14 @@ export default function AdminCorrectionsScreen() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  const requests = queue === 'MANAGER' ? managerRequests : hrRequests;
+
   const handleReview = async (id: string, status: 'APPROVED' | 'REJECTED') => {
     Alert.alert(
       `${status === 'APPROVED' ? 'Approve' : 'Reject'} Request?`,
-      'Do you want to confirm this review?',
+      status === 'APPROVED' && queue === 'MANAGER'
+        ? 'This will send the correction to HR for final approval.'
+        : 'Do you want to confirm this review?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -76,7 +87,14 @@ export default function AdminCorrectionsScreen() {
             <Text style={s.userDept}>{item.employee.profile?.department || 'Member'}</Text>
           </View>
         </View>
-        <Text style={s.dateText}>{formatDateDMY(item.attendanceRecord.date, 'dd MMM yyyy')}</Text>
+        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+          <Text style={s.dateText}>{formatDateDMY(item.attendanceRecord.date, 'dd MMM yyyy')}</Text>
+          {item.approvalStage === 'MANAGER' && (
+            <View style={s.stageBadge}>
+              <Text style={s.stageText}>Stage 1 · Manager</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <View style={s.compareRow}>
@@ -127,7 +145,28 @@ export default function AdminCorrectionsScreen() {
       <StatusBar barStyle="dark-content" />
       <View style={s.header}>
         <Text style={s.headerTitle}>Approvals</Text>
-        <Text style={s.headerSub}>{requests.length} pending correction requests</Text>
+        <Text style={s.headerSub}>
+          {managerRequests.length + hrRequests.length} pending correction requests
+        </Text>
+      </View>
+
+      <View style={s.queueRow}>
+        <TouchableOpacity
+          style={[s.queueButton, queue === 'MANAGER' && s.queueButtonActive]}
+          onPress={() => setQueue('MANAGER')}
+        >
+          <Text style={[s.queueText, queue === 'MANAGER' && s.queueTextActive]}>
+            My team · {managerRequests.length}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.queueButton, queue === 'HR' && s.queueButtonActive]}
+          onPress={() => setQueue('HR')}
+        >
+          <Text style={[s.queueText, queue === 'HR' && s.queueTextActive]}>
+            HR final · {hrRequests.length}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -168,6 +207,13 @@ const s = StyleSheet.create({
   header: { padding: 24, paddingBottom: 16 },
   headerTitle: { fontSize: 28, fontWeight: '800', color: C.navy },
   headerSub: { fontSize: 14, color: C.subtle, marginTop: 4, fontWeight: '500' },
+  queueRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, marginBottom: 14 },
+  queueButton: { flex: 1, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.white, paddingVertical: 10, alignItems: 'center' },
+  queueButtonActive: { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' },
+  queueText: { fontSize: 11, fontWeight: '700', color: C.subtle },
+  queueTextActive: { color: C.accent },
+  stageBadge: { borderRadius: 6, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', paddingHorizontal: 6, paddingVertical: 3 },
+  stageText: { fontSize: 8, fontWeight: '800', color: '#B45309' },
   list: { paddingHorizontal: 20, paddingBottom: 120 },
   card: { backgroundColor: C.white, borderRadius: 24, padding: 20, marginBottom: 20, elevation: 2 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },

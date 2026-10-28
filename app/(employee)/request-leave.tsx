@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useCreateLeave, useMyLeaveBalances } from '@/features/leaves/hooks';
+import type { LeaveDuration } from '@/features/leaves/api';
 // Defensive import for DateTimePicker to prevent top-level crash
 let DateTimePicker: any = null;
 try {
@@ -19,6 +22,42 @@ const LEAVE_TYPES = [
   { key: 'OTHER', label: 'Other / Unpaid' },
 ];
 
+const DURATIONS: Array<{ key: LeaveDuration; label: string; caption: string }> = [
+  { key: 'FULL_DAY', label: 'Full day', caption: 'Counts as 1 day' },
+  { key: 'FIRST_HALF', label: 'Morning', caption: 'First half · 0.5 day' },
+  { key: 'SECOND_HALF', label: 'Afternoon', caption: 'Second half · 0.5 day' },
+];
+
+interface PickedAttachment {
+  fileName: string;
+  mimeType: string;
+  data: string;
+  size: number;
+}
+
+function guessMimeType(fileName: string, mimeType?: string) {
+  if (mimeType && mimeType !== 'application/octet-stream') return mimeType;
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.pdf')) return 'application/pdf';
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.heic') || lower.endsWith('.heif')) return 'image/heic';
+  return 'image/jpeg';
+}
+
+/** Send the picked calendar day as UTC midnight so @db.Date never shifts. */
+function toApiDate(date: Date) {
+  return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString();
+}
+
+function isSameLocalDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
 function formatCycleDate(value?: string) {
   if (!value) return '';
   const [year, month, day] = value.split('-').map(Number);
@@ -31,22 +70,73 @@ function RequestLeaveScreen() {
   const { data: balances, isLoading: loadingBalances } = useMyLeaveBalances();
 
   const [type, setType] = useState('CASUAL');
+  const [duration, setDuration] = useState<LeaveDuration>('FULL_DAY');
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
   const [reason, setReason] = useState('');
+  const [attachment, setAttachment] = useState<PickedAttachment | null>(null);
+  const [pickingFile, setPickingFile] = useState(false);
   const [showStart, setShowStart] = useState(false);
   const [showEnd, setShowEnd] = useState(false);
 
+  const isHalfDay = duration !== 'FULL_DAY';
+
+  const handlePickAttachment = async () => {
+    try {
+      setPickingFile(true);
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      if (asset.size && asset.size > 5 * 1024 * 1024) {
+        Alert.alert('File too large', 'Medical notes must be 5 MB or smaller.');
+        return;
+      }
+
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
+      setAttachment({
+        fileName: asset.name,
+        mimeType: guessMimeType(asset.name, asset.mimeType),
+        data: base64,
+        size: asset.size ?? Math.ceil((base64.length * 3) / 4),
+      });
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Attachment error', 'Could not read the selected file.');
+    } finally {
+      setPickingFile(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (reason.length < 5) return Alert.alert('Error', 'Please provide a reason (min 5 chars)');
-    if (endDate < startDate) return Alert.alert('Error', 'End date cannot be before start date');
+    if (!isHalfDay && endDate < startDate) {
+      return Alert.alert('Error', 'End date cannot be before start date');
+    }
+    if (isHalfDay && !isSameLocalDay(startDate, endDate)) {
+      return Alert.alert('Error', 'A half-day leave must be on a single date.');
+    }
 
     try {
       await createLeave.mutateAsync({
-        type,
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        reason
+        type: type as 'SICK' | 'CASUAL' | 'VACATION' | 'OTHER',
+        duration,
+        startDate: toApiDate(startDate),
+        endDate: toApiDate(isHalfDay ? startDate : endDate),
+        reason,
+        ...(attachment
+          ? {
+              attachment: {
+                fileName: attachment.fileName,
+                mimeType: attachment.mimeType,
+                data: attachment.data,
+              },
+            }
+          : {}),
       });
       Alert.alert('Success', 'Leave request submitted!');
       router.back();
@@ -140,9 +230,40 @@ function RequestLeaveScreen() {
           </View>
         </View>
 
+        {/* Duration */}
+        <View className="mb-6">
+          <Text className="text-[13px] font-bold text-[#64748B] mb-2.5 uppercase tracking-wide">Duration</Text>
+          <View className="flex-row gap-2">
+            {DURATIONS.map((option) => (
+              <TouchableOpacity
+                key={option.key}
+                className={`flex-1 rounded-xl border px-2 py-3 ${duration === option.key ? 'border-[#5B6EF5] bg-[#EEF2FF]' : 'border-[#E5E9F2] bg-[#F3F4F8]'}`}
+                onPress={() => {
+                  setDuration(option.key);
+                  if (option.key !== 'FULL_DAY') setEndDate(startDate);
+                }}
+              >
+                <Text className={`text-center text-xs font-bold ${duration === option.key ? 'text-[#4F46E5]' : 'text-[#1C2840]'}`}>
+                  {option.label}
+                </Text>
+                <Text className={`mt-1 text-center text-[9px] font-medium ${duration === option.key ? 'text-[#6366F1]' : 'text-[#94A3B8]'}`}>
+                  {option.caption}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {isHalfDay && (
+            <Text className="mt-2 text-[11px] font-medium text-[#64748B]">
+              Half-day leave deducts 0.5 day and keeps the attendance record open for the other half.
+            </Text>
+          )}
+        </View>
+
         {/* Start Date */}
         <View className="mb-6">
-          <Text className="text-[13px] font-bold text-[#64748B] mb-2.5 uppercase tracking-wide">Start Date</Text>
+          <Text className="text-[13px] font-bold text-[#64748B] mb-2.5 uppercase tracking-wide">
+            {isHalfDay ? 'Leave Date' : 'Start Date'}
+          </Text>
           <TouchableOpacity
             className="p-4 bg-[#F3F4F8] rounded-xl flex-row items-center gap-3 border border-[#E5E9F2]"
             onPress={() => setShowStart(true)}
@@ -154,7 +275,13 @@ function RequestLeaveScreen() {
             <DateTimePicker
               value={startDate}
               mode="date"
-              onChange={(e: any, date?: Date) => { setShowStart(false); if (date) setStartDate(date); }}
+              onChange={(e: any, date?: Date) => {
+                setShowStart(false);
+                if (date) {
+                  setStartDate(date);
+                  if (isHalfDay) setEndDate(date);
+                }
+              }}
             />
           )}
           {showStart && !DateTimePicker && (
@@ -163,7 +290,10 @@ function RequestLeaveScreen() {
               placeholder="DD-MM-YYYY"
               onSubmitEditing={(e) => {
                 const d = parseDMY(e.nativeEvent.text);
-                if (d) setStartDate(d);
+                if (d) {
+                  setStartDate(d);
+                  if (isHalfDay) setEndDate(d);
+                }
                 setShowStart(false);
               }}
               autoFocus
@@ -172,6 +302,7 @@ function RequestLeaveScreen() {
         </View>
 
         {/* End Date */}
+        {!isHalfDay && (
         <View className="mb-6">
           <Text className="text-[13px] font-bold text-[#64748B] mb-2.5 uppercase tracking-wide">End Date</Text>
           <TouchableOpacity
@@ -199,6 +330,58 @@ function RequestLeaveScreen() {
               }}
               autoFocus
             />
+          )}
+        </View>
+        )}
+
+        {/* Medical attachment */}
+        <View className="mb-6">
+          <Text className="mb-2.5 text-[13px] font-bold uppercase tracking-wide text-[#64748B]">
+            Medical note <Text className="normal-case text-[#94A3B8]">(optional)</Text>
+          </Text>
+          {attachment ? (
+            <View className="flex-row items-center gap-3 rounded-xl border border-[#C7D2FE] bg-[#EEF2FF] p-3.5">
+              <View className="h-10 w-10 items-center justify-center rounded-lg bg-white">
+                <Ionicons
+                  name={attachment.mimeType === 'application/pdf' ? 'document-text-outline' : 'image-outline'}
+                  size={20}
+                  color="#5B6EF5"
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-bold text-[#1C2840]" numberOfLines={1}>
+                  {attachment.fileName}
+                </Text>
+                <Text className="mt-0.5 text-[10px] font-medium text-[#64748B]">
+                  {(attachment.size / 1024 / 1024).toFixed(2)} MB · attached
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setAttachment(null)}
+                className="h-8 w-8 items-center justify-center rounded-full bg-white"
+              >
+                <Ionicons name="close" size={17} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={handlePickAttachment}
+              disabled={pickingFile}
+              className="flex-row items-center gap-3 rounded-xl border border-dashed border-[#CBD5E1] bg-[#F8FAFC] p-4"
+            >
+              {pickingFile ? (
+                <ActivityIndicator size="small" color="#5B6EF5" />
+              ) : (
+                <Ionicons name="attach-outline" size={21} color="#5B6EF5" />
+              )}
+              <View className="flex-1">
+                <Text className="text-sm font-bold text-[#1C2840]">Attach a medical note</Text>
+                <Text className="mt-0.5 text-[10px] text-[#94A3B8]">
+                  PDF, JPG, PNG, or WEBP · up to 5 MB
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
           )}
         </View>
 

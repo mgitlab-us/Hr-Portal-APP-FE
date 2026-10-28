@@ -22,6 +22,21 @@ export function useAdminPendingLeaves() {
   });
 }
 
+export function useManagerPendingLeaves() {
+  return useQuery({
+    queryKey: ['leaves', 'manager', 'pending'],
+    queryFn: leavesApi.getManagerPending,
+  });
+}
+
+export function useTeamLeaveCalendar(from: string, to: string, enabled = true) {
+  return useQuery({
+    queryKey: ['leaves', 'calendar', from, to],
+    queryFn: () => leavesApi.getCalendar(from, to),
+    enabled,
+  });
+}
+
 export function useCreateLeave() {
   const queryClient = useQueryClient();
   return useMutation({

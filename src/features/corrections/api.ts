@@ -16,6 +16,11 @@ export const correctionApi = {
     return response.data;
   },
 
+  async getManagerPending() {
+    const response = await apiClient.get('/corrections/manager/pending');
+    return response.data;
+  },
+
   async review(id: string, data: { status: 'APPROVED' | 'REJECTED', reviewNote?: string }) {
     const response = await apiClient.patch(`/corrections/${id}/review`, data);
     return response.data;

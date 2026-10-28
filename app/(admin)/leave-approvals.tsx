@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAdminPendingLeaves, useReviewLeave } from '@/features/leaves/hooks';
+import {
+  useAdminPendingLeaves,
+  useManagerPendingLeaves,
+  useReviewLeave,
+} from '@/features/leaves/hooks';
 import { formatDateRangeDMY } from '@/lib/datetime';
 import { LeaveRequest } from '@/features/leaves/api';
 
@@ -18,13 +22,27 @@ const C = {
 };
 
 export default function LeaveApprovalsScreen() {
-  const { data: pending, isLoading, refetch, error } = useAdminPendingLeaves();
+  const [queue, setQueue] = useState<'MANAGER' | 'HR'>('MANAGER');
+  const managerQuery = useManagerPendingLeaves();
+  const adminQuery = useAdminPendingLeaves();
   const reviewLeave = useReviewLeave();
+
+  const managerPending = managerQuery.data || [];
+  const adminPending = adminQuery.data || [];
+  const pending = queue === 'MANAGER' ? managerPending : adminPending;
+  const isLoading = managerQuery.isLoading || adminQuery.isLoading;
+  const error = queue === 'MANAGER' ? managerQuery.error : adminQuery.error;
+  const refetch = () => {
+    managerQuery.refetch();
+    adminQuery.refetch();
+  };
 
   const handleReview = (id: string, status: 'APPROVED' | 'REJECTED') => {
     Alert.alert(
       `${status === 'APPROVED' ? 'Approve' : 'Reject'} Leave?`,
-      `Are you sure you want to mark this request as ${status.toLowerCase()}?`,
+      status === 'APPROVED' && queue === 'MANAGER'
+        ? 'This will send the request to HR for final approval.'
+        : `Are you sure you want to mark this request as ${status.toLowerCase()}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -52,6 +70,31 @@ export default function LeaveApprovalsScreen() {
       >
         <Text style={s.title}>Pending Requests</Text>
 
+        <View style={s.queueRow}>
+          <TouchableOpacity
+            style={[s.queueButton, queue === 'MANAGER' && s.queueButtonActive]}
+            onPress={() => setQueue('MANAGER')}
+          >
+            <Text style={[s.queueText, queue === 'MANAGER' && s.queueTextActive]}>
+              My team · {managerPending.length}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.queueButton, queue === 'HR' && s.queueButtonActive]}
+            onPress={() => setQueue('HR')}
+          >
+            <Text style={[s.queueText, queue === 'HR' && s.queueTextActive]}>
+              HR final · {adminPending.length}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={s.queueHint}>
+          {queue === 'MANAGER'
+            ? 'Manager approval moves the request to HR.'
+            : 'HR approval is final and deducts the leave balance.'}
+        </Text>
+
         {isLoading ? (
           <ActivityIndicator color={C.accent} style={{ marginTop: 40 }} />
         ) : error ? (
@@ -77,8 +120,15 @@ export default function LeaveApprovalsScreen() {
                     {req.employee?.profile?.employeeCode} • {req.employee?.profile?.department}
                   </Text>
                 </View>
-                <View style={s.typeBadge}>
-                  <Text style={s.typeText}>{req.type}</Text>
+                <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                  <View style={s.typeBadge}>
+                    <Text style={s.typeText}>{req.type}</Text>
+                  </View>
+                  {req.approvalStage === 'MANAGER' && (
+                    <View style={s.stageBadge}>
+                      <Text style={s.stageText}>Stage 1 · Manager</Text>
+                    </View>
+                  )}
                 </View>
               </View>
 
@@ -87,7 +137,23 @@ export default function LeaveApprovalsScreen() {
                 <Text style={s.dateText}>
                   {formatDateRangeDMY(req.startDate, req.endDate)}
                 </Text>
+                {req.duration && req.duration !== 'FULL_DAY' && (
+                  <View style={s.halfBadge}>
+                    <Text style={s.halfText}>
+                      {req.duration === 'FIRST_HALF' ? 'AM · 0.5' : 'PM · 0.5'}
+                    </Text>
+                  </View>
+                )}
               </View>
+
+              {req.attachment && (
+                <View style={s.attachmentRow}>
+                  <Ionicons name="attach" size={13} color="#4F46E5" />
+                  <Text style={s.attachmentText} numberOfLines={1}>
+                    {req.attachment.fileName}
+                  </Text>
+                </View>
+              )}
 
               <Text style={s.reason} numberOfLines={3}>{req.reason}</Text>
 
@@ -118,8 +184,28 @@ export default function LeaveApprovalsScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   scroll: { padding: 20 },
-  title: { fontSize: 20, fontWeight: '800', color: C.navy, marginBottom: 20 },
+  title: { fontSize: 20, fontWeight: '800', color: C.navy, marginBottom: 12 },
+  queueRow: { flexDirection: 'row', gap: 8, marginBottom: 6 },
+  queueButton: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.white,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  queueButtonActive: { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' },
+  queueText: { fontSize: 11, fontWeight: '700', color: C.gray },
+  queueTextActive: { color: C.accent },
+  queueHint: { fontSize: 10, color: '#94A3B8', marginBottom: 18, marginTop: 2 },
   card: { backgroundColor: C.white, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: C.border },
+  stageBadge: { borderRadius: 6, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', paddingHorizontal: 6, paddingVertical: 3 },
+  stageText: { fontSize: 8, fontWeight: '800', color: '#B45309' },
+  halfBadge: { borderRadius: 5, backgroundColor: '#EEF2FF', paddingHorizontal: 5, paddingVertical: 2 },
+  halfText: { fontSize: 9, fontWeight: '800', color: '#4F46E5' },
+  attachmentRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 8 },
+  attachmentText: { flex: 1, fontSize: 10, fontWeight: '600', color: '#4F46E5' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
   empName: { fontSize: 16, fontWeight: '700', color: C.navy },
   empInfo: { fontSize: 12, color: C.gray },
