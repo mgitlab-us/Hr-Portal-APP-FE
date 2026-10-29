@@ -52,6 +52,7 @@ export default function EmployeeLayout() {
       <Tabs.Screen name="approvals" options={{ href: null }} />
       <Tabs.Screen name="team-calendar" options={{ href: null }} />
       <Tabs.Screen name="payslips" options={{ href: null }} />
+      <Tabs.Screen name="documents" options={{ href: null }} />
     </Tabs>
   );
 }
