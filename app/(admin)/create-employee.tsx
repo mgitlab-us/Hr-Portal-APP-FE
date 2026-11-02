@@ -87,14 +87,13 @@ export default function CreateEmployeeScreen() {
   const isSuperAdmin = employee?.role === 'SUPER_ADMIN';
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(true);
-  const [managers, setManagers] = useState<{ id: string; name: string; designation?: string }[]>([]);
   const insets = useSafeAreaInsets();
   const bottomPad = 114 + insets.bottom + 16;
 
   const { control, handleSubmit, formState: { errors }, watch, setValue, setError, reset } = useForm({
     defaultValues: {
       name: '', email: '', phone: '', employeeCode: '',
-      designation: '', departmentId: '', managerId: '',
+      designation: '', departmentId: '',
       joiningDate: formatDateDMY(new Date()), role: 'EMPLOYEE', shiftProfileId: '',
     },
   });
@@ -117,28 +116,6 @@ export default function CreateEmployeeScreen() {
       .finally(() => {
         if (mounted) setDepartmentsLoading(false);
       });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-    employeeApi
-      .list()
-      .then((result) => {
-        if (!mounted || !Array.isArray(result)) return;
-        setManagers(
-          result
-            .filter((item: any) => item.isActive)
-            .map((item: any) => ({
-              id: item.id,
-              name: item.name,
-              designation: item.profile?.designation,
-            }))
-        );
-      })
-      .catch(() => {});
     return () => {
       mounted = false;
     };
@@ -192,7 +169,6 @@ export default function CreateEmployeeScreen() {
         password: tempPassword,
         mustChangePassword: true,
         departmentId: data.departmentId || undefined,
-        managerId: data.managerId || undefined,
         joiningDate: joiningDate
           ? new Date(
               Date.UTC(
@@ -351,56 +327,25 @@ export default function CreateEmployeeScreen() {
               />
             </View>
             <View style={f.group}>
-              <Text style={f.label}>Reports To (optional)</Text>
-              <Controller control={control} name="managerId"
-                render={({ field: { onChange, value } }) => (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={s.shiftRow}
-                  >
-                    <TouchableOpacity
-                      style={[s.shiftCard, !value && s.shiftCardActive]}
-                      onPress={() => onChange('')}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons
-                        name="people-outline"
-                        size={16}
-                        color={!value ? C.accent : C.muted}
-                      />
-                      <Text style={[s.shiftName, !value && s.shiftNameActive]}>No manager</Text>
-                      <Text style={s.shiftMeta}>HR approves first</Text>
-                    </TouchableOpacity>
-                    {managers.map((manager) => {
-                      const active = value === manager.id;
-                      return (
-                        <TouchableOpacity
-                          key={manager.id}
-                          style={[s.shiftCard, active && s.shiftCardActive]}
-                          onPress={() => onChange(manager.id)}
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons
-                            name="person-outline"
-                            size={16}
-                            color={active ? C.accent : C.muted}
-                          />
-                          <Text style={[s.shiftName, active && s.shiftNameActive]}>
-                            {manager.name}
-                          </Text>
-                          <Text style={s.shiftMeta}>
-                            {manager.designation || 'Direct manager'}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                )}
-              />
-              <Text style={f.hint}>
-                Requests are approved by this manager first, then by HR.
-              </Text>
+              <Text style={f.label}>Reporting manager</Text>
+              <View
+                style={{
+                  borderRadius: 12,
+                  borderWidth: StyleSheet.hairlineWidth,
+                  borderColor: '#C7D2FE',
+                  backgroundColor: '#EEF2FF',
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#3730A3' }}>
+                  Assigned by department
+                </Text>
+                <Text style={{ marginTop: 2, fontSize: 11, color: '#4F46E5' }}>
+                  Every MANAGER assigned to this employee&apos;s department can give the
+                  first approval. Managers are configured from the Departments page.
+                </Text>
+              </View>
             </View>
             <Controller control={control} name="employeeCode"
               rules={{
@@ -452,7 +397,7 @@ export default function CreateEmployeeScreen() {
               <Controller control={control} name="role"
                 render={({ field: { onChange, value } }) => (
                   <View style={s.rolePicker}>
-                    {(isSuperAdmin ? ['EMPLOYEE', 'ADMIN', 'SUPER_ADMIN'] : ['EMPLOYEE']).map((r) => (
+                    {(isSuperAdmin ? ['EMPLOYEE', 'MANAGER', 'ADMIN', 'SUPER_ADMIN'] : ['EMPLOYEE']).map((r) => (
                       <TouchableOpacity
                         key={r}
                         style={[s.rolePill, value === r && s.rolePillActive]}

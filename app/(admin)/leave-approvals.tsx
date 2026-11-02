@@ -9,6 +9,7 @@ import {
 } from '@/features/leaves/hooks';
 import { formatDateRangeDMY } from '@/lib/datetime';
 import { LeaveRequest } from '@/features/leaves/api';
+import { useAuthStore } from '@/features/auth/store';
 
 const C = {
   bg: '#F8FAFC',
@@ -22,6 +23,8 @@ const C = {
 };
 
 export default function LeaveApprovalsScreen() {
+  const { employee } = useAuthStore();
+  const canUseHrQueue = employee?.role === 'ADMIN' || employee?.role === 'SUPER_ADMIN';
   const [queue, setQueue] = useState<'MANAGER' | 'HR'>('MANAGER');
   const managerQuery = useManagerPendingLeaves();
   const adminQuery = useAdminPendingLeaves();
@@ -79,14 +82,16 @@ export default function LeaveApprovalsScreen() {
               My team · {managerPending.length}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.queueButton, queue === 'HR' && s.queueButtonActive]}
-            onPress={() => setQueue('HR')}
-          >
-            <Text style={[s.queueText, queue === 'HR' && s.queueTextActive]}>
-              HR final · {adminPending.length}
-            </Text>
-          </TouchableOpacity>
+          {canUseHrQueue && (
+            <TouchableOpacity
+              style={[s.queueButton, queue === 'HR' && s.queueButtonActive]}
+              onPress={() => setQueue('HR')}
+            >
+              <Text style={[s.queueText, queue === 'HR' && s.queueTextActive]}>
+                HR final · {adminPending.length}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <Text style={s.queueHint}>

@@ -8,7 +8,11 @@ export default function Index() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  if (employee?.role === 'ADMIN' || employee?.role === 'SUPER_ADMIN') {
+  if (
+    employee?.role === 'ADMIN' ||
+    employee?.role === 'SUPER_ADMIN' ||
+    employee?.role === 'MANAGER'
+  ) {
     return <Redirect href="/(admin)/" />;
   }
 

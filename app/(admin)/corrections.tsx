@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { correctionApi } from '@/features/corrections/api';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDateDMY, formatTime12h } from '@/lib/datetime';
+import { useAuthStore } from '@/features/auth/store';
 
 const C = {
   navy: '#0F1D3A',
@@ -19,6 +20,8 @@ const C = {
 };
 
 export default function AdminCorrectionsScreen() {
+  const { employee } = useAuthStore();
+  const canUseHrQueue = employee?.role === 'ADMIN' || employee?.role === 'SUPER_ADMIN';
   const [managerRequests, setManagerRequests] = useState<any[]>([]);
   const [hrRequests, setHrRequests] = useState<any[]>([]);
   const [queue, setQueue] = useState<'MANAGER' | 'HR'>('MANAGER');
@@ -159,14 +162,16 @@ export default function AdminCorrectionsScreen() {
             My team · {managerRequests.length}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.queueButton, queue === 'HR' && s.queueButtonActive]}
-          onPress={() => setQueue('HR')}
-        >
-          <Text style={[s.queueText, queue === 'HR' && s.queueTextActive]}>
-            HR final · {hrRequests.length}
-          </Text>
-        </TouchableOpacity>
+        {canUseHrQueue && (
+          <TouchableOpacity
+            style={[s.queueButton, queue === 'HR' && s.queueButtonActive]}
+            onPress={() => setQueue('HR')}
+          >
+            <Text style={[s.queueText, queue === 'HR' && s.queueTextActive]}>
+              HR final · {hrRequests.length}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {loading ? (

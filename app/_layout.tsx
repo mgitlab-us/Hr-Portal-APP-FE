@@ -26,7 +26,9 @@ export default function RootLayout() {
       if (employee?.mustChangePassword) {
         if (!segments.includes('change-password')) router.replace('/(auth)/change-password');
       } else if (inAuthGroup) {
-        const target = (employee?.role === 'ADMIN' || employee?.role === 'SUPER_ADMIN') 
+        const target = (employee?.role === 'ADMIN' ||
+          employee?.role === 'SUPER_ADMIN' ||
+          employee?.role === 'MANAGER')
           ? '/(admin)/' : '/(employee)/';
         router.replace(target);
       }

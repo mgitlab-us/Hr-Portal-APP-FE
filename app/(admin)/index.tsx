@@ -158,11 +158,14 @@ const pr = StyleSheet.create({
 export default function AdminHome() {
   const { stats, pulse, loading, refreshing, onRefresh, employee } = useAdminDashboard();
   const isSuperAdmin = employee?.role === 'SUPER_ADMIN';
+  const isManager = employee?.role === 'MANAGER';
 
   const actions = [
     { title: 'Staff Directory', icon: 'people-outline', color: C.accent, route: '/(admin)/employees' },
     { title: 'Attendance', icon: 'calendar-outline', color: C.teal, route: '/(admin)/daily-logs' },
-    { title: 'Data Export', icon: 'document-text-outline', color: C.amber, route: '/(admin)/reports' },
+    ...(!isManager
+      ? [{ title: 'Data Export', icon: 'document-text-outline', color: C.amber, route: '/(admin)/reports' }]
+      : []),
     ...(!isSuperAdmin ? [
       { title: 'Leave Requests', icon: 'mail-outline', color: C.violet, route: '/(admin)/leave-approvals' },
       { title: 'Correction Requests', icon: 'sync-outline', color: '#10B981', route: '/(admin)/corrections' },

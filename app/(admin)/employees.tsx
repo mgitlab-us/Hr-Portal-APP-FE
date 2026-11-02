@@ -40,6 +40,8 @@ function EmployeeCard({ item, currentEmployee, onDeactivate }: any) {
   const isAdmin = item.role !== 'EMPLOYEE';
   const isSelf = item.id === currentEmployee?.id;
   const isSuperAdmin = item.role === 'SUPER_ADMIN';
+  const canManageEmployees =
+    currentEmployee?.role === 'SUPER_ADMIN' || currentEmployee?.role === 'ADMIN';
 
   return (
     <View style={card.wrap}>
@@ -68,7 +70,7 @@ function EmployeeCard({ item, currentEmployee, onDeactivate }: any) {
         <Text style={card.email} numberOfLines={1}>{item.email}</Text>
       </View>
 
-      {!isSelf && !isSuperAdmin && (
+      {canManageEmployees && !isSelf && !isSuperAdmin && (
         <TouchableOpacity style={card.delBtn} onPress={() => onDeactivate(item)} activeOpacity={0.7}>
           <Ionicons name="trash-outline" size={16} color="#EF4444" />
         </TouchableOpacity>
@@ -130,6 +132,8 @@ export default function EmployeesScreen() {
   } = useEmployees();
 
   const insets = useSafeAreaInsets();
+  const canManageEmployees =
+    currentEmployee?.role === 'SUPER_ADMIN' || currentEmployee?.role === 'ADMIN';
 
   return (
     <View style={s.root}>
@@ -139,17 +143,21 @@ export default function EmployeesScreen() {
       <SafeAreaView style={s.header}>
         <View style={s.topRow}>
           <View>
-            <Text style={s.adminTag}>Admin</Text>
+            <Text style={s.adminTag}>
+              {currentEmployee?.role === 'MANAGER' ? 'Manager' : 'Admin'}
+            </Text>
             <Text style={s.title}>Team Directory</Text>
             <Text style={s.sub}>{filteredEmployees.length} active members</Text>
           </View>
-          <TouchableOpacity
-            style={s.addBtn}
-            activeOpacity={0.8}
-            onPress={() => router.push('/(admin)/create-employee')}
-          >
-            <Ionicons name="person-add-outline" size={16} color="#fff" />
-          </TouchableOpacity>
+          {canManageEmployees && (
+            <TouchableOpacity
+              style={s.addBtn}
+              activeOpacity={0.8}
+              onPress={() => router.push('/(admin)/create-employee')}
+            >
+              <Ionicons name="person-add-outline" size={16} color="#fff" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Search */}

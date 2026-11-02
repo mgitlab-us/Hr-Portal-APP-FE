@@ -16,6 +16,7 @@ export default function AdminLayout() {
 
   const isSuperAdmin = role === 'SUPER_ADMIN';
   const isAdmin = role === 'ADMIN';
+  const isManager = role === 'MANAGER';
 
   return (
     <Tabs
@@ -39,7 +40,7 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="corrections"
         options={{
-          href: isAdmin ? undefined : null,
+          href: isSuperAdmin ? null : undefined,
           title: 'Corrections',
           tabBarIcon: ({ color, size }) => <Ionicons name="checkmark-circle" size={size} color={color} />,
         }}
@@ -63,6 +64,7 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="reports"
         options={{
+          href: isManager ? null : undefined,
           title: 'Reports',
           tabBarIcon: ({ color, size }) => <Ionicons name="document-text" size={size} color={color} />,
         }}
